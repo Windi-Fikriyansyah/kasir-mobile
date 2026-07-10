@@ -4,6 +4,8 @@ import 'package:kasirsuper/app/routes.dart';
 import 'package:kasirsuper/core/core.dart';
 import 'package:kasirsuper/features/home/blocs/blocs.dart';
 import 'package:kasirsuper/features/settings/settings.dart';
+import 'package:kasirsuper/features/product/blocs/blocs.dart';
+import 'package:kasirsuper/core/database/database_helper.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -15,6 +17,7 @@ class MyApp extends StatelessWidget {
       providers: [
         BlocProvider(create: (context) => BottomNavBloc()),
         BlocProvider(create: (context) => ProfileBloc()),
+        BlocProvider(create: (context) => ProductBloc(databaseHelper: DatabaseHelper())..add(LoadProducts())),
       ],
       child: MaterialApp(
         title: 'Kasir Super',

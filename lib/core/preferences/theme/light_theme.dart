@@ -55,7 +55,7 @@ class LightTheme {
 
   LightTheme(this.primaryColor);
 
-  CardTheme get cardTheme => CardTheme(
+  CardThemeData get cardTheme => CardThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
