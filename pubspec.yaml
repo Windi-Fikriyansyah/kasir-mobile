@@ -44,7 +44,8 @@ dependencies:
   sqflite: ^2.4.3
   path_provider: ^2.1.6
   image_picker: ^1.1.2
-
+  intl: ^0.20.3
+  mobile_scanner: ^7.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

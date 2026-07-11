@@ -5,6 +5,7 @@ import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/product/models/product_model.dart';
 import 'package:kasirsuper/features/product/pages/add_product/page.dart';
+import 'package:intl/intl.dart';
 class ProductPage extends StatefulWidget {
   const ProductPage({super.key});
 
@@ -14,6 +15,64 @@ class ProductPage extends StatefulWidget {
 
 class _ProductPageState extends State<ProductPage> {
   String _activeCategory = 'Semua Item';
+  String _searchQuery = '';
+  String _activeSort = 'Terbaru';
+
+  void _showSortFilterDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Widget buildSortOption(String label) {
+              return RadioListTile<String>(
+                value: label,
+                groupValue: _activeSort,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _activeSort = value;
+                    });
+                    setModalState(() {
+                      _activeSort = value;
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+                title: Text(label),
+                contentPadding: EdgeInsets.zero,
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Urutkan Berdasarkan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  buildSortOption('Terbaru'),
+                  buildSortOption('Nama (A-Z)'),
+                  buildSortOption('Nama (Z-A)'),
+                  buildSortOption('Harga Tertinggi'),
+                  buildSortOption('Harga Terendah'),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          }
+        );
+      },
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<ProductBloc>().add(LoadProducts());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,82 +120,112 @@ class _ProductPageState extends State<ProductPage> {
   }
 
   Widget _buildHeroSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.end,
+    return BlocBuilder<ProductBloc, ProductState>(
+      builder: (context, state) {
+        int totalSku = 0;
+        double totalValue = 0;
+        int lowStock = 0;
+        int outStock = 0;
+
+        if (state is ProductLoaded) {
+          totalSku = state.products.length;
+          for (var p in state.products) {
+            totalValue += p.price * p.stock;
+            if (p.stock == 0) {
+              outStock++;
+            } else if (p.stock <= p.minStock) {
+              lowStock++;
+            }
+          }
+        }
+
+        String formattedValue;
+        if (totalValue >= 1000000) {
+          formattedValue = 'Rp ${(totalValue / 1000000).toStringAsFixed(1)}jt';
+        } else if (totalValue >= 1000) {
+          formattedValue = 'Rp ${(totalValue / 1000).toStringAsFixed(1)}rb';
+        } else {
+          formattedValue = 'Rp ${totalValue.toInt()}';
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Ringkasan Inventaris',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: QuickPOSColors.onSurface,
-                  ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Ringkasan Inventaris',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: QuickPOSColors.onSurface,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Data Produk',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: QuickPOSColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 4),
-                Text(
-                  'Data Produk',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: QuickPOSColors.onSurfaceVariant,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: QuickPOSColors.surfaceContainer,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: QuickPOSColors.secondary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Online',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: QuickPOSColors.onSurface,
+                          fontFamily: 'JetBrains Mono',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: QuickPOSColors.surfaceContainer,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: QuickPOSColors.secondary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Text(
-                    'Online',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: QuickPOSColors.onSurface,
-                      fontFamily: 'JetBrains Mono',
-                    ),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _buildSummaryCard('TOTAL SKU', '$totalSku')),
+                const SizedBox(width: 8),
+                Expanded(child: _buildSummaryCard('NILAI', formattedValue)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildSummaryCard('STOK MENIPIS', '$lowStock', isError: true)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildSummaryCard('STOK HABIS', '$outStock')),
+              ],
             ),
           ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _buildSummaryCard('TOTAL SKU', '1.284')),
-            const SizedBox(width: 8),
-            Expanded(child: _buildSummaryCard('NILAI', 'Rp 42.5jt')),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(child: _buildSummaryCard('STOK MENIPIS', '12', isError: true)),
-            const SizedBox(width: 8),
-            Expanded(child: _buildSummaryCard('STOK HABIS', '3')),
-          ],
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -191,6 +280,11 @@ class _ProductPageState extends State<ProductPage> {
     return Column(
       children: [
         TextField(
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value;
+            });
+          },
           decoration: InputDecoration(
             hintText: 'Cari nama produk, SKU atau kategori...',
             hintStyle: const TextStyle(color: QuickPOSColors.outline),
@@ -213,31 +307,39 @@ class _ProductPageState extends State<ProductPage> {
           ),
         ),
         const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildCategoryChip('Semua Item'),
-              _buildCategoryChip('Pakaian'),
-              _buildCategoryChip('Elektronik'),
-              _buildCategoryChip('Aksesoris'),
-              _buildCategoryChip('Peralatan Rumah'),
-              const SizedBox(width: 4),
-              Container(
-                decoration: const BoxDecoration(
-                  color: QuickPOSColors.surfaceContainerHigh,
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.filter_list, size: 20, color: QuickPOSColors.onSurfaceVariant),
-                  onPressed: () {},
-                  splashRadius: 20,
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(8),
-                ),
+        BlocBuilder<ProductBloc, ProductState>(
+          builder: (context, state) {
+            List<String> categories = ['Semua Item'];
+            if (state is ProductLoaded) {
+              final uniqueCategories = state.products.map((p) => p.category).toSet().toList();
+              uniqueCategories.removeWhere((c) => c.trim().isEmpty || c == 'Semua Item');
+              uniqueCategories.sort();
+              categories.addAll(uniqueCategories);
+            }
+            
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ...categories.map((c) => _buildCategoryChip(c)),
+                  const SizedBox(width: 4),
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: QuickPOSColors.surfaceContainerHigh,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.filter_list, size: 20, color: QuickPOSColors.onSurfaceVariant),
+                      onPressed: _showSortFilterDialog,
+                      splashRadius: 20,
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
       ],
     );
@@ -275,7 +377,26 @@ class _ProductPageState extends State<ProductPage> {
         if (state is ProductLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is ProductLoaded) {
-          if (state.products.isEmpty) {
+          final filteredProducts = state.products.where((p) {
+            final matchesCategory = _activeCategory == 'Semua Item' || p.category == _activeCategory;
+            final matchesSearch = p.name.toLowerCase().contains(_searchQuery.toLowerCase()) || 
+                                  p.sku.toLowerCase().contains(_searchQuery.toLowerCase());
+            return matchesCategory && matchesSearch;
+          }).toList();
+
+          if (_activeSort == 'Nama (A-Z)') {
+            filteredProducts.sort((a, b) => a.name.compareTo(b.name));
+          } else if (_activeSort == 'Nama (Z-A)') {
+            filteredProducts.sort((a, b) => b.name.compareTo(a.name));
+          } else if (_activeSort == 'Harga Tertinggi') {
+            filteredProducts.sort((a, b) => b.price.compareTo(a.price));
+          } else if (_activeSort == 'Harga Terendah') {
+            filteredProducts.sort((a, b) => a.price.compareTo(b.price));
+          } else {
+            filteredProducts.sort((a, b) => (b.id ?? 0).compareTo(a.id ?? 0));
+          }
+
+          if (filteredProducts.isEmpty) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(32.0),
@@ -286,10 +407,10 @@ class _ProductPageState extends State<ProductPage> {
           return ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: state.products.length,
+            itemCount: filteredProducts.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final product = state.products[index];
+              final product = filteredProducts[index];
               return _buildProductItem(product);
             },
           );
@@ -320,6 +441,33 @@ class _ProductPageState extends State<ProductPage> {
         alignment: Alignment.centerRight,
         child: const Icon(Icons.delete, color: Colors.white),
       ),
+      confirmDismiss: (direction) async {
+        return await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Konfirmasi Hapus'),
+              content: Text('Apakah Anda yakin ingin menghapus produk "${product.name}"?'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Batal', style: TextStyle(color: QuickPOSColors.outline)),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: QuickPOSColors.error,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Hapus'),
+                ),
+              ],
+            );
+          },
+        );
+      },
       onDismissed: (direction) {
         if (product.id != null) {
           context.read<ProductBloc>().add(DeleteProductEvent(product.id!));
@@ -409,7 +557,7 @@ class _ProductPageState extends State<ProductPage> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Rp ${product.price}',
+                        NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0).format(product.price),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

@@ -481,6 +481,8 @@ class _BestSellingSection extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: DashboardColors.onSurface,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   sku,
@@ -488,6 +490,8 @@ class _BestSellingSection extends StatelessWidget {
                     fontSize: 12,
                     color: DashboardColors.onSurfaceVariant,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

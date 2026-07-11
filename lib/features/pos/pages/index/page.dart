@@ -1,6 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
+import 'package:kasirsuper/features/pos/blocs/pos_bloc.dart';
 import 'package:kasirsuper/features/pos/pages/checkout/page.dart';
+import 'package:kasirsuper/features/pos/pages/scanner/page.dart';
+import 'package:kasirsuper/features/product/blocs/blocs.dart';
+import 'package:kasirsuper/features/product/models/product_model.dart';
 
 class POSPage extends StatefulWidget {
   const POSPage({super.key});
@@ -10,31 +17,18 @@ class POSPage extends StatefulWidget {
 }
 
 class _POSPageState extends State<POSPage> {
-  int cartCount = 0;
-  double cartTotal = 0.0;
   String activeCategory = 'Semua Item';
-
-  void addToCart(String name, double price) {
-    setState(() {
-      cartCount++;
-      cartTotal += price;
-    });
-
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$name ditambahkan ke keranjang!'),
-        duration: const Duration(milliseconds: 1500),
-        backgroundColor: QuickPOSColors.secondary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
+  String searchQuery = '';
 
   void filterCategory(String category) {
     setState(() {
       activeCategory = category;
+    });
+  }
+
+  void onSearchChanged(String query) {
+    setState(() {
+      searchQuery = query;
     });
   }
 
@@ -51,13 +45,28 @@ class _POSPageState extends State<POSPage> {
                 color: QuickPOSColors.surface,
                 child: Column(
                   children: [
-            const _SearchBarSection(),
-            _CategoryChips(
-              activeCategory: activeCategory,
-              onCategoryTap: filterCategory,
-            ),
+                    _SearchBarSection(onChanged: onSearchChanged),
+                    BlocBuilder<ProductBloc, ProductState>(
+                      builder: (context, state) {
+                        List<String> categories = ['Semua Item'];
+                        if (state is ProductLoaded) {
+                          final uniqueCategories = state.products.map((p) => p.category).toSet().toList();
+                          uniqueCategories.removeWhere((c) => c.trim().isEmpty || c == 'Semua Item');
+                          uniqueCategories.sort();
+                          categories.addAll(uniqueCategories);
+                        }
+                        return _CategoryChips(
+                          categories: categories,
+                          activeCategory: activeCategory,
+                          onCategoryTap: filterCategory,
+                        );
+                      },
+                    ),
                     Expanded(
-                      child: _ProductGrid(onAddToCart: addToCart),
+                      child: _ProductGrid(
+                        activeCategory: activeCategory,
+                        searchQuery: searchQuery,
+                      ),
                     ),
                   ],
                 ),
@@ -66,9 +75,13 @@ class _POSPageState extends State<POSPage> {
           ],
         ),
       ),
-      bottomNavigationBar: _CheckoutBottomBar(
-        count: cartCount,
-        total: cartTotal,
+      bottomNavigationBar: BlocBuilder<PosBloc, PosState>(
+        builder: (context, state) {
+          return _CheckoutBottomBar(
+            count: state.totalQuantity,
+            total: state.totalAmount,
+          );
+        },
       ),
     );
   }
@@ -112,20 +125,28 @@ class _POSAppBar extends StatelessWidget {
 }
 
 class _SearchBarSection extends StatelessWidget {
-  const _SearchBarSection();
+  final ValueChanged<String> onChanged;
+  
+  const _SearchBarSection({required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: TextField(
+        onChanged: onChanged,
         decoration: InputDecoration(
           hintText: 'Cari produk atau SKU...',
           hintStyle: const TextStyle(color: QuickPOSColors.outline, fontSize: 16),
           prefixIcon: const Icon(Icons.search, color: QuickPOSColors.outline),
           suffixIcon: IconButton(
             icon: const Icon(Icons.qr_code_scanner, color: QuickPOSColors.onSurfaceVariant),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ScannerPage()),
+              );
+            },
           ),
           filled: true,
           fillColor: QuickPOSColors.surfaceContainerLow,
@@ -145,15 +166,14 @@ class _SearchBarSection extends StatelessWidget {
 }
 
 class _CategoryChips extends StatelessWidget {
+  final List<String> categories;
   final String activeCategory;
   final Function(String) onCategoryTap;
 
-  const _CategoryChips({required this.activeCategory, required this.onCategoryTap});
+  const _CategoryChips({required this.categories, required this.activeCategory, required this.onCategoryTap});
 
   @override
   Widget build(BuildContext context) {
-    final categories = ['Semua Item', 'Cemilan', 'Minuman', 'Rumah Tangga', 'Elektronik', 'Kesehatan'];
-    
     return Container(
       height: 48,
       margin: const EdgeInsets.only(bottom: 8),
@@ -192,76 +212,97 @@ class _CategoryChips extends StatelessWidget {
 }
 
 class _ProductGrid extends StatelessWidget {
-  final Function(String, double) onAddToCart;
+  final String activeCategory;
+  final String searchQuery;
 
-  const _ProductGrid({required this.onAddToCart});
+  const _ProductGrid({
+    required this.activeCategory,
+    required this.searchQuery,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 32),
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 0.65, 
-      children: [
-        _buildProductCard(
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBcR7wo7SYKIHXOGEtPGpCKt0UMSxscZvUE3ftXSekf8ebzTyaiJmsILJuUlvEmlXyHLkO_DR0zWUtR-YeZRLch8ArXQ6wP5paA6_9ctGRZvAQCgsPen_RggSDEyzHgv2qxZg7j4Ic7lIh4iv6rXf7lMvHkBhjgo6yIWTZ10yowiXMJzKSK60TKSUNfwNp7TIYKHec678b6tLa5bwkXtm6IDuw1sGwV7uoD__xI0rp4O85SxD8bWsnJIg',
-          category: 'Minuman',
-          title: 'Blue Volt Energy',
-          price: 3.50,
-          tag: 'TERSEDIA',
-          tagColor: QuickPOSColors.secondaryContainer,
-          tagTextColor: QuickPOSColors.onSecondaryContainer,
-        ),
-        _buildProductCard(
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAFfsi8de6V88l0PeeXzDFDKf0P6o5Fv6PHoDUs-tpCgUAGBxssWlG1JGh4BpC6lI_l2yMU2MvkpbXglq1OmWi2G7aXwmoieLSk3PtLH-h8ZwNldeBfjSufoPg9eaqXRh5PFYP-2qNi6A7EucxKoufzr92ABDjyOr-KN07WRnPatiPsERiN_zqm6XaDA9dhfsmB7IwRFUWOx5kC44QkWowgXYH0Ta7-I6USJrhfO2o31OUIRXa1hTGO7w',
-          category: 'Cemilan',
-          title: 'Sea Salt Crisps',
-          price: 2.25,
-        ),
-        _buildProductCard(
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCKdbMsXyY4umpgjcClkd_DrA_qTZXF2mCREaAWp8rUgb_fuEsZZafSgXBTuqcBKnHQIRrRiMluCJsZEBRLWxY4O0HSwv6SZGWIL1xvp2WzzZ4nZUy_mAc4AJlB6VwBxPQwj3nlQdPM9nX3yKAKLuobQ5CF25q3IZyTc3hSrIYJJOdjc9tBNn5p1V7yDaXyUO6xNXOI2eKT32p8qU75jtunirWFLSUaJ58KI_kDVuFRDpDD2vZnsghqWA',
-          category: 'Rumah Tangga',
-          title: 'Eco Glass Cleaner',
-          price: 5.99,
-        ),
-        _buildProductCard(
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDNC4kNb1RQdIQOntLpbFHvFHfu833fwoUDTRPhhZtKC8lNPjjgoFTAW-9KkAcmXP46h-AZz9zh4L8Oj_Tr09KW-8Spp7LrxzIh23ecAlnMo_Mf0J48JqqunBOW6VHladc6Yoyk0DZXWXBOTXH7iGrBrsSgnZ0vulKPDmg0pCr7fhcoRQmRjAFTVxVjpqVKayDVnKiAWnxoUSZD_zhxH7EjeFzal2AznI00hGnoRSx6wdguw5OA5X84LQ',
-          category: 'Elektronik',
-          title: 'Sonic Buds Lite',
-          price: 29.00,
-        ),
-        _buildProductCard(
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCKBLA5dM9yufcxPph8N0hIqQh7mjtelCCw0d3C3SBWTf3HF55-eoeMjz70hFeKAMJyQeQY1XqJ7a3AMcQ1AGu0mSjsKZ-nhVnZ1U6WwjahKp5uzyp4Mfici-Zp-2a32NpzTF4cKA_ESUqkntwddeLuNQ8rA07A3DXVpqbLKuAZ01FCYTaPfIAO0L3UjMD0AgNryG8uJPvHafM-K-OPxi37vUXKcrdVlNnneSGOjtB-QiItRVcpKNjffQ',
-          category: 'Minuman',
-          title: 'Sparkling Water',
-          price: 1.50,
-        ),
-        _buildProductCard(
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAoE2Hb2M93H-BgQRU3Xnl9Y9rp4pHyJSSqeU-tIwQEIReA6Xxnq98ERZdEJKeCnstAS9lQtP2YW5cIXyF9XjfwjV_BELuG8Tft15Xa4bNRqe3Lb6Vcgf49en_UIb16FLvIE3fzSW7R-Y8TLwVQs4SzcjX6wAaXO9832kZ2znHreK-3cuE4vHSzrU3Zxqwjo2us9aEJa7idWJ35SP7eQUO7GB38cfZ9aJ4g4IBlxbncYrpWF81kEosmYg',
-          category: 'Kesehatan',
-          title: 'Daily Multivitamins',
-          price: 14.99,
-          tag: 'Stok Menipis',
-          tagColor: QuickPOSColors.errorContainer,
-          tagTextColor: QuickPOSColors.onErrorContainer,
-        ),
-      ],
+    return BlocBuilder<ProductBloc, ProductState>(
+      builder: (context, state) {
+        if (state is ProductLoading) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is ProductLoaded) {
+          final filteredProducts = state.products.where((p) {
+            final matchesCategory = activeCategory == 'Semua Item' || p.category == activeCategory;
+            final matchesSearch = p.name.toLowerCase().contains(searchQuery.toLowerCase()) || 
+                                  p.sku.toLowerCase().contains(searchQuery.toLowerCase());
+            return matchesCategory && matchesSearch;
+          }).toList();
+
+          if (filteredProducts.isEmpty) {
+            return const Center(
+              child: Text('Tidak ada produk', style: TextStyle(color: QuickPOSColors.outline)),
+            );
+          }
+
+          return GridView.builder(
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 32),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 0.65,
+            ),
+            itemCount: filteredProducts.length,
+            itemBuilder: (context, index) {
+              final product = filteredProducts[index];
+              final isOut = product.stock == 0;
+              final isLow = product.stock > 0 && product.stock <= product.minStock;
+              
+              String? tag;
+              Color? tagColor;
+              Color? tagTextColor;
+              
+              if (isOut) {
+                tag = 'Habis';
+                tagColor = QuickPOSColors.error;
+                tagTextColor = Colors.white;
+              } else if (isLow) {
+                tag = 'Menipis';
+                tagColor = QuickPOSColors.errorContainer;
+                tagTextColor = QuickPOSColors.onErrorContainer;
+              } else {
+                tag = 'Tersedia';
+                tagColor = QuickPOSColors.secondaryContainer;
+                tagTextColor = QuickPOSColors.onSecondaryContainer;
+              }
+
+              return _buildProductCard(
+                context: context,
+                product: product,
+                tag: tag,
+                tagColor: tagColor,
+                tagTextColor: tagTextColor,
+              );
+            },
+          );
+        } else if (state is ProductError) {
+          return Center(child: Text(state.message, style: const TextStyle(color: QuickPOSColors.error)));
+        }
+        return const SizedBox();
+      },
     );
   }
 
   Widget _buildProductCard({
-    required String image,
-    required String category,
-    required String title,
-    required double price,
+    required BuildContext context,
+    required ProductModel product,
     String? tag,
     Color? tagColor,
     Color? tagTextColor,
   }) {
-    // Custom price formatter
-    final formattedPrice = 'Rp ${price.toStringAsFixed(0)}';
+    final formattedPrice = NumberFormat.currency(
+      locale: 'id',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    ).format(product.price);
+    
+    final imageUrl = product.imagePath ?? 'https://via.placeholder.com/150';
     
     return Container(
       decoration: BoxDecoration(
@@ -279,13 +320,14 @@ class _ProductGrid extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            flex: 4,
             child: Stack(
               fit: StackFit.expand,
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: Image.network(image, fit: BoxFit.cover),
+                  child: imageUrl.startsWith('http')
+                      ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(color: QuickPOSColors.surfaceContainerHigh))
+                      : Image.file(File(imageUrl), fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(color: QuickPOSColors.surfaceContainerHigh)),
                 ),
                 if (tag != null)
                   Positioned(
@@ -310,66 +352,87 @@ class _ProductGrid extends StatelessWidget {
               ],
             ),
           ),
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        category.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: QuickPOSColors.outline,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: QuickPOSColors.onSurface,
-                        ),
-                      ),
-                    ],
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  product.category.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: QuickPOSColors.outline,
+                    letterSpacing: 1.0,
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: QuickPOSColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
                         formattedPrice,
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: QuickPOSColors.onSurface,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      InkWell(
-                        onTap: () => onAddToCart(title, price),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: QuickPOSColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.add, color: QuickPOSColors.onPrimary, size: 20),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () {
+                        if (product.stock > 0) {
+                          context.read<PosBloc>().add(AddProductToCart(product));
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${product.name} ditambahkan ke keranjang!'),
+                              duration: const Duration(milliseconds: 1500),
+                              backgroundColor: QuickPOSColors.secondary,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Stok habis!'),
+                              backgroundColor: QuickPOSColors.error,
+                            ),
+                          );
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: product.stock > 0 ? QuickPOSColors.primary : QuickPOSColors.surfaceContainerHigh,
+                          shape: BoxShape.circle,
                         ),
+                        child: Icon(Icons.add, color: product.stock > 0 ? QuickPOSColors.onPrimary : QuickPOSColors.outline, size: 18),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -386,7 +449,11 @@ class _CheckoutBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final formattedTotal = 'Rp ${total.toStringAsFixed(0)}';
+    final formattedTotal = NumberFormat.currency(
+      locale: 'id',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    ).format(total);
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -403,115 +470,82 @@ class _CheckoutBottomBar extends StatelessWidget {
       ),
       child: SafeArea(
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Flexible(
-              child: Row(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const Icon(Icons.shopping_basket, color: QuickPOSColors.secondary, size: 32),
-                      if (count > 0)
-                        Positioned(
-                          top: -4,
-                          right: -4,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: QuickPOSColors.secondary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              '$count',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: QuickPOSColors.onSecondary,
-                              ),
-                            ),
-                          ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.shopping_basket, color: QuickPOSColors.secondary, size: 32),
+                if (count > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: QuickPOSColors.secondary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: QuickPOSColors.onSecondary,
                         ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  Flexible(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'RINGKASAN KERANJANG',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: QuickPOSColors.outline,
-                          ),
-                        ),
-                        Text(
-                          '$count Item',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: QuickPOSColors.onSurface,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'TOTAL',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: QuickPOSColors.outline,
+                    ),
+                  ),
+                  Text(
+                    formattedTotal,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: QuickPOSColors.onSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            Row(
-              children: [
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      'TOTAL',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: QuickPOSColors.outline,
-                      ),
-                    ),
-                    Text(
-                      formattedTotal,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: QuickPOSColors.onSurface,
-                      ),
-                    ),
-                  ],
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: count > 0 
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CheckoutPage(),
+                        ),
+                      );
+                    }
+                  : null,
+              icon: const Icon(Icons.payment, size: 18),
+              label: const Text('Bayar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: QuickPOSColors.primary,
+                foregroundColor: QuickPOSColors.onPrimary,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 16),
-                ElevatedButton.icon(
-                  onPressed: count > 0 
-                      ? () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CheckoutPage(
-                                cartCount: count,
-                                cartTotal: total,
-                              ),
-                            ),
-                          );
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: QuickPOSColors.secondary,
-                    foregroundColor: QuickPOSColors.onSecondary,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: const Text('BAYAR', style: TextStyle(fontWeight: FontWeight.bold)),
-                  label: const Icon(Icons.arrow_forward, size: 20),
-                ),
-              ],
+              ),
             ),
           ],
         ),

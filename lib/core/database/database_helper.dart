@@ -1,4 +1,6 @@
 import 'package:kasirsuper/features/product/models/product_model.dart';
+import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
+import 'package:kasirsuper/features/transaction/models/transaction_item_model.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -22,8 +24,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -42,6 +45,29 @@ class DatabaseHelper {
       )
     ''');
     
+    await db.execute('''
+      CREATE TABLE transactions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT,
+        total_amount REAL,
+        amount_given REAL,
+        change REAL,
+        payment_method TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE transaction_items(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_id INTEGER,
+        product_id INTEGER,
+        product_name TEXT,
+        price REAL,
+        quantity INTEGER,
+        FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE CASCADE
+      )
+    ''');
+    
     // Insert some initial data
     await db.execute('''
       INSERT INTO products (name, sku, category, price, cost, stock, minStock)
@@ -51,6 +77,33 @@ class DatabaseHelper {
         ('Artisan Ceramic Mug', 'SKU: HOM-0043-T', 'Peralatan Rumah', 18500, 10000, 58, 20),
         ('Rapid-Sync 1TB Drive', 'SKU: ACC-8831-S', 'Aksesoris', 115000, 90000, 5, 10)
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE transactions(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT,
+          total_amount REAL,
+          amount_given REAL,
+          change REAL,
+          payment_method TEXT
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE transaction_items(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          transaction_id INTEGER,
+          product_id INTEGER,
+          product_name TEXT,
+          price REAL,
+          quantity INTEGER,
+          FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE CASCADE
+        )
+      ''');
+    }
   }
 
   // CRUD for Products
@@ -86,5 +139,31 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // Transactions
+  Future<int> insertTransaction(TransactionModel transaction) async {
+    final db = await database;
+    int transactionId = 0;
+    
+    await db.transaction((txn) async {
+      transactionId = await txn.insert('transactions', transaction.toMap());
+      
+      if (transaction.items != null) {
+        for (var item in transaction.items!) {
+          final itemMap = item.toMap();
+          itemMap['transaction_id'] = transactionId;
+          await txn.insert('transaction_items', itemMap);
+          
+          // Deduct stock
+          await txn.rawUpdate(
+            'UPDATE products SET stock = stock - ? WHERE id = ?',
+            [item.quantity, item.productId],
+          );
+        }
+      }
+    });
+    
+    return transactionId;
   }
 }

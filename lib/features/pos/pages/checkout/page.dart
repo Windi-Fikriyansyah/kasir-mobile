@@ -1,15 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
+import 'package:kasirsuper/features/pos/blocs/pos_bloc.dart';
+import 'package:kasirsuper/features/pos/models/cart_item_model.dart';
+import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
+import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
+import 'package:kasirsuper/features/transaction/models/transaction_item_model.dart';
+
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    String digitsOnly = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    if (digitsOnly.isEmpty) return newValue.copyWith(text: '');
+
+    final number = int.parse(digitsOnly);
+    final formatter = NumberFormat.currency(locale: 'id', symbol: '', decimalDigits: 0);
+    final newText = formatter.format(number).trim();
+
+    return newValue.copyWith(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
+  }
+}
 
 class CheckoutPage extends StatefulWidget {
-  final int cartCount;
-  final double cartTotal;
-
-  const CheckoutPage({
-    super.key,
-    required this.cartCount,
-    required this.cartTotal,
-  });
+  const CheckoutPage({super.key});
 
   @override
   State<CheckoutPage> createState() => _CheckoutPageState();
@@ -31,10 +53,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
     });
   }
 
-  void _handlePayment() {
+  void _handlePayment(BuildContext context) {
+    final posState = context.read<PosBloc>().state;
+    final total = posState.totalAmount;
+    double amountGiven = total;
+
     if (selectedPaymentMethod == 'cash') {
-      double? paidAmount = double.tryParse(_amountController.text);
-      if (paidAmount == null || paidAmount < widget.cartTotal) {
+      double? paidAmount = double.tryParse(_amountController.text.replaceAll('.', ''));
+      if (paidAmount == null || paidAmount < total) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Nominal bayar kurang atau tidak valid!'),
@@ -43,9 +69,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
         );
         return;
       }
+      amountGiven = paidAmount;
     }
     
-    // Payment Successful
+    final change = amountGiven - total;
+    
+    final items = posState.items.map((cartItem) => TransactionItemModel(
+      productId: cartItem.product.id!,
+      productName: cartItem.product.name,
+      price: cartItem.product.price.toDouble(),
+      quantity: cartItem.quantity,
+    )).toList();
+    
+    final transaction = TransactionModel(
+      date: DateTime.now().toIso8601String(),
+      totalAmount: total,
+      amountGiven: amountGiven,
+      change: change > 0 ? change : 0,
+      paymentMethod: selectedPaymentMethod!,
+      items: items,
+    );
+
+    context.read<TransactionBloc>().add(SaveTransaction(transaction));
+    context.read<PosBloc>().add(ClearCart());
+    
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Pembayaran Berhasil!'),
@@ -57,43 +104,48 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const _CheckoutAppBar(),
-            Expanded(
-              child: Container(
-                color: QuickPOSColors.surface,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _OrderSummarySection(
-                      cartCount: widget.cartCount,
-                      cartTotal: widget.cartTotal,
+    return BlocBuilder<PosBloc, PosState>(
+      builder: (context, posState) {
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: Column(
+              children: [
+                const _CheckoutAppBar(),
+                Expanded(
+                  child: Container(
+                    color: QuickPOSColors.surface,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _OrderSummarySection(
+                            cartCount: posState.totalQuantity,
+                            cartTotal: posState.totalAmount,
+                            items: posState.items,
+                          ),
+                          const SizedBox(height: 24),
+                          _PaymentCategoriesSection(
+                            selectedMethod: selectedPaymentMethod,
+                            onSelect: _selectPayment,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    _PaymentCategoriesSection(
-                      selectedMethod: selectedPaymentMethod,
-                      onSelect: _selectPayment,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                _BottomActionBar(
+                  selectedMethod: selectedPaymentMethod,
+                  cartTotal: posState.totalAmount,
+                  amountController: _amountController,
+                  onPayPressed: () => _handlePayment(context),
+                ),
+              ],
             ),
-            ),
-            _BottomActionBar(
-              selectedMethod: selectedPaymentMethod,
-              cartTotal: widget.cartTotal,
-              amountController: _amountController,
-              onPayPressed: _handlePayment,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -149,16 +201,22 @@ class _CheckoutAppBar extends StatelessWidget {
 class _OrderSummarySection extends StatelessWidget {
   final int cartCount;
   final double cartTotal;
+  final List<CartItemModel> items;
 
   const _OrderSummarySection({
     required this.cartCount,
     required this.cartTotal,
+    required this.items,
   });
 
   @override
   Widget build(BuildContext context) {
-    final formattedTotal = '\$${cartTotal.toStringAsFixed(2)}'; // using $ based on previous design, or Rp based on HTML
-    final realFormat = 'Rp ${cartTotal.toStringAsFixed(0)}';
+    final formatCurrency = NumberFormat.currency(
+      locale: 'id',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    final realFormat = formatCurrency.format(cartTotal);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -185,7 +243,7 @@ class _OrderSummarySection extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            realFormat, // Reverted to real format to match state
+            realFormat,
             style: const TextStyle(
               fontSize: 40,
               fontWeight: FontWeight.bold,
@@ -194,18 +252,19 @@ class _OrderSummarySection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _buildDummyItem('Blue Volt Energy (1x)', 'Rp 3.500'),
+          ...items.map((item) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: _buildOrderItem(context, item, formatCurrency.format(item.total)),
+          )),
           const SizedBox(height: 8),
-          _buildDummyItem('Sea Salt Crisps (2x)', 'Rp 4.500'),
-          const SizedBox(height: 16),
           const Divider(color: QuickPOSColors.outlineVariant),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'ORDER ID: #POS-20231024',
-                style: TextStyle(
+              Text(
+                'ORDER ID: #POS-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: QuickPOSColors.onSurfaceVariant,
@@ -226,26 +285,94 @@ class _OrderSummarySection extends StatelessWidget {
     );
   }
 
-  Widget _buildDummyItem(String name, String price) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          name,
-          style: const TextStyle(
-            fontSize: 14,
-            color: QuickPOSColors.onSurfaceVariant,
+  Widget _buildOrderItem(BuildContext context, CartItemModel item, String price) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.product.name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: QuickPOSColors.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        context.read<PosBloc>().add(RemoveProductFromCart(item.product));
+                        Future.delayed(const Duration(milliseconds: 100), () {
+                          if (context.mounted && context.read<PosBloc>().state.items.isEmpty) {
+                            Navigator.pop(context);
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: QuickPOSColors.error.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Icon(Icons.remove, size: 16, color: QuickPOSColors.error),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(width: 12),
+                    InkWell(
+                      onTap: () {
+                        context.read<PosBloc>().add(AddProductToCart(item.product));
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: QuickPOSColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Icon(Icons.add, size: 16, color: QuickPOSColors.primary),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        Text(
-          price,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: QuickPOSColors.onSurface,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                price,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: QuickPOSColors.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () {
+                  context.read<PosBloc>().add(DeleteProductFromCart(item.product));
+                  Future.delayed(const Duration(milliseconds: 100), () {
+                    if (context.mounted && context.read<PosBloc>().state.items.isEmpty) {
+                      Navigator.pop(context);
+                    }
+                  });
+                },
+                child: const Icon(Icons.delete_outline, size: 20, color: QuickPOSColors.error),
+              ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -355,39 +482,47 @@ class _PaymentCategoriesSection extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: iconBgColor,
-                    borderRadius: BorderRadius.circular(8),
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: iconBgColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, color: iconColor),
                   ),
-                  child: Icon(icon, color: iconColor),
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: QuickPOSColors.onSurface,
-                      ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: QuickPOSColors.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: QuickPOSColors.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: QuickPOSColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
             Container(
               width: 24,
@@ -407,7 +542,7 @@ class _PaymentCategoriesSection extends StatelessWidget {
                         height: 12,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: QuickPOSColors.secondary, // The mockup uses white inner but with solid green background. We'll adapt it.
+                          color: QuickPOSColors.secondary,
                         ),
                       ),
                     )
@@ -469,12 +604,16 @@ class _BottomActionBar extends StatelessWidget {
               ),
               TextField(
                 controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  CurrencyInputFormatter(),
+                ],
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: QuickPOSColors.onSurface),
                 decoration: InputDecoration(
                   prefixText: 'Rp ',
                   prefixStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: QuickPOSColors.onSurfaceVariant),
-                  hintText: '0.00',
+                  hintText: '0',
                   contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -505,12 +644,12 @@ class _BottomActionBar extends StatelessWidget {
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: amountController,
                       builder: (context, value, child) {
-                        double paidAmount = double.tryParse(value.text) ?? 0.0;
+                        double paidAmount = double.tryParse(value.text.replaceAll('.', '')) ?? 0.0;
                         double change = paidAmount - cartTotal;
                         if (change < 0) change = 0;
                         
                         return Text(
-                          'Rp ${change.toStringAsFixed(0)}',
+                          NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0).format(change),
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,

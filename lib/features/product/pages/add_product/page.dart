@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/product/models/product_model.dart';
+import 'package:kasirsuper/features/pos/pages/scanner/page.dart';
 
 class AddProductPage extends StatefulWidget {
   final ProductModel? product;
@@ -277,7 +278,20 @@ class _AddProductPageState extends State<AddProductPage> {
                     _buildTextField(
                       controller: _skuController,
                       hintText: '001-923',
-                      suffixIcon: Icons.qr_code_scanner,
+                      suffixWidget: IconButton(
+                        icon: const Icon(Icons.qr_code_scanner, color: QuickPOSColors.onSurfaceVariant),
+                        onPressed: () async {
+                          final sku = await Navigator.push<String>(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ScannerPage(returnSkuOnly: true)),
+                          );
+                          if (sku != null && sku.isNotEmpty) {
+                            setState(() {
+                              _skuController.text = sku;
+                            });
+                          }
+                        },
+                      ),
                       fontFamily: 'JetBrains Mono',
                     ),
                   ],
