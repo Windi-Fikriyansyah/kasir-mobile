@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
+import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
+import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
 
 class TransactionPage extends StatefulWidget {
   const TransactionPage({super.key});
@@ -10,6 +14,20 @@ class TransactionPage extends StatefulWidget {
 
 class _TransactionPageState extends State<TransactionPage> {
   String _activeFilter = 'Hari Ini';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<TransactionBloc>().add(LoadTransactions());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +82,12 @@ class _TransactionPageState extends State<TransactionPage> {
           const SizedBox(height: 16),
           // Search Bar
           TextField(
+            controller: _searchController,
+            onChanged: (val) {
+              setState(() {
+                _searchQuery = val;
+              });
+            },
             decoration: InputDecoration(
               hintText: 'Cari ID Transaksi...',
               hintStyle: const TextStyle(color: QuickPOSColors.outline),
@@ -162,39 +186,85 @@ class _TransactionPageState extends State<TransactionPage> {
   }
 
   Widget _buildTransactionList() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      children: [
-        _buildDateHeader('Hari Ini — 24 Okt 2023'),
-        _buildTransactionItem(
-          id: 'TXN-89021',
-          timeAndItems: '14:32 • 3 item',
-          price: 'Rp 142.500',
-          isRefunded: false,
-        ),
-        const SizedBox(height: 8),
-        _buildTransactionItem(
-          id: 'TXN-89018',
-          timeAndItems: '11:15 • 1 item',
-          price: 'Rp 24.000',
-          isRefunded: true,
-        ),
-        const SizedBox(height: 8),
-        _buildTransactionItem(
-          id: 'TXN-89015',
-          timeAndItems: '09:45 • 12 item',
-          price: 'Rp 892.120',
-          isRefunded: false,
-        ),
-        const SizedBox(height: 24),
-        _buildDateHeader('Kemarin — 23 Okt 2023'),
-        _buildTransactionItem(
-          id: 'TXN-88950',
-          timeAndItems: '18:12 • 2 item',
-          price: 'Rp 56.000',
-          isRefunded: false,
-        ),
-      ],
+    return BlocBuilder<TransactionBloc, TransactionState>(
+      builder: (context, state) {
+        if (state is TransactionLoading || state is TransactionInitial) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (state is TransactionLoaded) {
+          final formatCurrency = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
+          final now = DateTime.now();
+          
+          var filtered = state.transactions.where((txn) {
+            final dt = DateTime.parse(txn.date);
+            bool matchDate = true;
+            if (_activeFilter == 'Hari Ini') {
+              matchDate = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+            } else if (_activeFilter == 'Kemarin') {
+              final yesterday = now.subtract(const Duration(days: 1));
+              matchDate = dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day;
+            } else if (_activeFilter == '7 Hari Terakhir') {
+              matchDate = now.difference(dt).inDays <= 7;
+            }
+            
+            bool matchSearch = true;
+            if (_searchQuery.isNotEmpty) {
+              final txnId = 'TXN-${txn.id.toString().padLeft(4, '0')}';
+              matchSearch = txnId.toLowerCase().contains(_searchQuery.toLowerCase());
+            }
+            
+            return matchDate && matchSearch;
+          }).toList();
+          
+          if (filtered.isEmpty) {
+            return const Center(
+              child: Text('Tidak ada transaksi', style: TextStyle(color: QuickPOSColors.outline)),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
+              final txn = filtered[index];
+              final dt = DateTime.parse(txn.date);
+              final timeStr = DateFormat('HH:mm').format(dt);
+              final dateStr = DateFormat('dd MMM yyyy').format(dt);
+              
+              int totalItems = txn.items?.fold<int>(0, (sum, i) => sum + i.quantity) ?? 0;
+              final txnId = 'TXN-${txn.id.toString().padLeft(4, '0')}';
+
+              bool showHeader = false;
+              if (index == 0) {
+                showHeader = true;
+              } else {
+                final prevDt = DateTime.parse(filtered[index-1].date);
+                if (DateFormat('dd MMM yyyy').format(prevDt) != dateStr) {
+                  showHeader = true;
+                }
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (showHeader) _buildDateHeader(dateStr),
+                  _buildTransactionItem(
+                    id: txnId,
+                    timeAndItems: '$timeStr • $totalItems item',
+                    price: formatCurrency.format(txn.totalAmount),
+                    isRefunded: false,
+                    transaction: txn,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              );
+            },
+          );
+        }
+        
+        return const Center(child: Text('Gagal memuat transaksi', style: TextStyle(color: QuickPOSColors.error)));
+      },
     );
   }
 
@@ -218,9 +288,10 @@ class _TransactionPageState extends State<TransactionPage> {
     required String timeAndItems,
     required String price,
     required bool isRefunded,
+    required TransactionModel transaction,
   }) {
     return InkWell(
-      onTap: () => _showReceiptModal(id),
+      onTap: () => _showReceiptModal(id, transaction),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -318,7 +389,8 @@ class _TransactionPageState extends State<TransactionPage> {
     );
   }
 
-  void _showReceiptModal(String txnId) {
+  void _showReceiptModal(String txnId, TransactionModel txn) {
+    final formatCurrency = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
     showDialog(
       context: context,
       builder: (ctx) {
@@ -389,22 +461,22 @@ class _TransactionPageState extends State<TransactionPage> {
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
-                        _buildReceiptItem('Organic Espresso Beans (500g)', 'Rp 18.500'),
-                        const SizedBox(height: 8),
-                        _buildReceiptItem('Ceramic Pour-over Kit', 'Rp 45.000'),
-                        const SizedBox(height: 8),
-                        _buildReceiptItem('Barista Grade Oat Milk (x4)', 'Rp 14.000'),
-                        const SizedBox(height: 24),
+                        if (txn.items != null)
+                          ...txn.items!.map((item) => Column(
+                            children: [
+                              _buildReceiptItem('${item.productName} (${item.quantity}x)', formatCurrency.format(item.price * item.quantity)),
+                              const SizedBox(height: 8),
+                            ],
+                          )),
+                        const SizedBox(height: 16),
                         const Divider(color: QuickPOSColors.outlineVariant),
                         const SizedBox(height: 16),
-                        _buildReceiptRow('Subtotal', 'Rp 77.500'),
-                        const SizedBox(height: 8),
-                        _buildReceiptRow('Pajak (8%)', 'Rp 6.200'),
+                        _buildReceiptRow('Subtotal', formatCurrency.format(txn.totalAmount)),
                         const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: const [
-                            Text(
+                          children: [
+                            const Text(
                               'Total',
                               style: TextStyle(
                                 fontSize: 20,
@@ -412,8 +484,8 @@ class _TransactionPageState extends State<TransactionPage> {
                               ),
                             ),
                             Text(
-                              'Rp 83.700',
-                              style: TextStyle(
+                              formatCurrency.format(txn.totalAmount),
+                              style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -421,15 +493,18 @@ class _TransactionPageState extends State<TransactionPage> {
                           ],
                         ),
                         const SizedBox(height: 24),
-                        const Text(
-                          'DIBAYAR VIA VISA **** 4242',
-                          style: TextStyle(
+                        Text(
+                          'DIBAYAR VIA ${txn.paymentMethod.toUpperCase()}',
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: QuickPOSColors.outline,
                             letterSpacing: 1.0,
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        _buildReceiptRow('Tunai / Bayar', formatCurrency.format(txn.amountGiven)),
+                        _buildReceiptRow('Kembali', formatCurrency.format(txn.change)),
                         const SizedBox(height: 16),
                         // Fake barcode
                         SizedBox(

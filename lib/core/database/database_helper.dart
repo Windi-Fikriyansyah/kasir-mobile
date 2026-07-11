@@ -166,4 +166,25 @@ class DatabaseHelper {
     
     return transactionId;
   }
+
+  Future<List<TransactionModel>> getAllTransactions() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('transactions', orderBy: 'date DESC');
+    
+    List<TransactionModel> transactions = [];
+    for (var map in maps) {
+      final id = map['id'];
+      
+      final List<Map<String, dynamic>> itemMaps = await db.query(
+        'transaction_items',
+        where: 'transaction_id = ?',
+        whereArgs: [id],
+      );
+      
+      final items = itemMaps.map((itemMap) => TransactionItemModel.fromMap(itemMap)).toList();
+      transactions.add(TransactionModel.fromMap(map, items: items));
+    }
+    
+    return transactions;
+  }
 }

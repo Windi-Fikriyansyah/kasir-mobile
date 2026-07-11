@@ -49,6 +49,7 @@ class TransactionBloc extends Bloc<TransactionEvent, TransactionState> {
 
   TransactionBloc({required this.databaseHelper}) : super(TransactionInitial()) {
     on<SaveTransaction>(_onSaveTransaction);
+    on<LoadTransactions>(_onLoadTransactions);
   }
 
   Future<void> _onSaveTransaction(SaveTransaction event, Emitter<TransactionState> emit) async {
@@ -58,6 +59,16 @@ class TransactionBloc extends Bloc<TransactionEvent, TransactionState> {
       emit(TransactionSuccess());
     } catch (e) {
       emit(TransactionError('Gagal menyimpan transaksi: $e'));
+    }
+  }
+
+  Future<void> _onLoadTransactions(LoadTransactions event, Emitter<TransactionState> emit) async {
+    emit(TransactionLoading());
+    try {
+      final transactions = await databaseHelper.getAllTransactions();
+      emit(TransactionLoaded(transactions));
+    } catch (e) {
+      emit(TransactionError('Gagal memuat transaksi: $e'));
     }
   }
 }
