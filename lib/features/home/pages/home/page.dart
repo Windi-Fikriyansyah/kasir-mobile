@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,7 @@ import 'package:kasirsuper/core/core.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
+import 'package:kasirsuper/features/home/home.dart';
 
 typedef DashboardColors = QuickPOSColors;
 
@@ -46,9 +48,9 @@ class _HomePageState extends State<HomePage> {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const _WelcomeSection(),
-                              const SizedBox(height: 24),
                               _SalesSummarySection(txState: txState),
+                              const SizedBox(height: 16),
+                              _SalesChartSection(txState: txState),
                               const SizedBox(height: 16),
                               const _QuickActionsSection(),
                               const SizedBox(height: 24),
@@ -66,13 +68,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: DashboardColors.primary,
-        foregroundColor: DashboardColors.onPrimary,
-        shape: const CircleBorder(),
-        onPressed: () {},
-        child: const Icon(Icons.add),
       ),
     );
   }
@@ -115,66 +110,6 @@ class _HomeAppBar extends StatelessWidget {
   }
 }
 
-class _WelcomeSection extends StatelessWidget {
-  const _WelcomeSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Selamat pagi, Shift #421',
-          style: TextStyle(
-            fontSize: 14,
-            color: DashboardColors.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Selamat datang kembali, Jane',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: DashboardColors.onSurface,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: DashboardColors.surfaceContainer,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: DashboardColors.outlineVariant.withOpacity(0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: DashboardColors.secondaryContainer,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Terminal POS 01 Online',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: DashboardColors.secondary,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _SalesSummarySection extends StatelessWidget {
   final TransactionState txState;
@@ -340,74 +275,357 @@ class _SalesSummarySection extends StatelessWidget {
   }
 }
 
+class _SalesChartSection extends StatefulWidget {
+  final TransactionState txState;
+  const _SalesChartSection({required this.txState});
+
+  @override
+  State<_SalesChartSection> createState() => _SalesChartSectionState();
+}
+
+class _SalesChartSectionState extends State<_SalesChartSection> {
+  String _activeFilter = 'Minggu Ini';
+  String _activeTab = 'Pendapatan';
+
+  void _showFilterDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Widget buildFilterOption(String label) {
+              return RadioListTile<String>(
+                value: label,
+                groupValue: _activeFilter,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _activeFilter = value;
+                    });
+                    setModalState(() {
+                      _activeFilter = value;
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+                title: Text(label),
+                contentPadding: EdgeInsets.zero,
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Filter Waktu', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  buildFilterOption('Hari Ini'),
+                  buildFilterOption('Minggu Ini'),
+                  buildFilterOption('Bulan Ini'),
+                  buildFilterOption('Sepanjang Waktu'),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          }
+        );
+      },
+    );
+  }
+
+  Widget _buildTab(String label) {
+    bool isActive = _activeTab == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _activeTab = label;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? DashboardColors.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            color: isActive ? DashboardColors.onPrimary : DashboardColors.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    List<FlSpot> spots = [];
+    double maxY = 10;
+    double minX = 0;
+    double maxX = 6;
+    
+    if (widget.txState is TransactionLoaded) {
+      final now = DateTime.now();
+      Map<int, double> dataMap = {};
+      
+      if (_activeFilter == 'Hari Ini') {
+        minX = 0; maxX = 23;
+      } else if (_activeFilter == 'Minggu Ini') {
+        minX = 0; maxX = 6;
+      } else if (_activeFilter == 'Bulan Ini') {
+        minX = 1; maxX = 31;
+      } else if (_activeFilter == 'Sepanjang Waktu') {
+        minX = 1; maxX = 12;
+      }
+      
+      for (var txn in (widget.txState as TransactionLoaded).transactions) {
+        final dt = DateTime.parse(txn.date);
+        
+        double valueToAdd = 0;
+        if (_activeTab == 'Pendapatan') {
+          valueToAdd = txn.totalAmount;
+        } else {
+          if (txn.items != null) {
+            valueToAdd = txn.items!.fold(0.0, (sum, item) => sum + item.quantity);
+          }
+        }
+        
+        if (_activeFilter == 'Hari Ini') {
+          if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+             dataMap[dt.hour] = (dataMap[dt.hour] ?? 0) + valueToAdd;
+          }
+        } else if (_activeFilter == 'Minggu Ini') {
+          final diff = now.difference(dt).inDays;
+          if (diff <= 6 && diff >= 0) {
+             int index = 6 - diff;
+             dataMap[index] = (dataMap[index] ?? 0) + valueToAdd;
+          }
+        } else if (_activeFilter == 'Bulan Ini') {
+          if (dt.year == now.year && dt.month == now.month) {
+             dataMap[dt.day] = (dataMap[dt.day] ?? 0) + valueToAdd;
+          }
+        } else if (_activeFilter == 'Sepanjang Waktu') {
+          if (dt.year == now.year) {
+             dataMap[dt.month] = (dataMap[dt.month] ?? 0) + valueToAdd;
+          }
+        }
+      }
+      
+      for (int i = minX.toInt(); i <= maxX.toInt(); i++) {
+        double val = dataMap[i] ?? 0;
+        spots.add(FlSpot(i.toDouble(), val));
+        if (val > maxY) maxY = val * 1.2;
+      }
+    } else {
+      spots = const [FlSpot(0, 0), FlSpot(1, 0), FlSpot(2, 0), FlSpot(3, 0), FlSpot(4, 0), FlSpot(5, 0), FlSpot(6, 0)];
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: DashboardColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: DashboardColors.outlineVariant.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Tren Penjualan',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: DashboardColors.onSurface,
+                ),
+              ),
+              Row(
+                children: [
+                  Text(
+                    _activeFilter,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: DashboardColors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: DashboardColors.surfaceContainerHigh,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.filter_list, size: 16, color: DashboardColors.onSurfaceVariant),
+                      onPressed: _showFilterDialog,
+                      splashRadius: 16,
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(6),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildTab('Pendapatan'),
+              const SizedBox(width: 8),
+              _buildTab('Unit'),
+            ],
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (touchedSpot) => Colors.white,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((LineBarSpot touchedSpot) {
+                        final val = touchedSpot.y;
+                        String text = '';
+                        if (_activeTab == 'Pendapatan') {
+                          text = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0).format(val);
+                        } else {
+                          text = val.toInt().toString();
+                        }
+                        return LineTooltipItem(
+                          text,
+                          const TextStyle(color: DashboardColors.onSurface, fontWeight: FontWeight.bold, fontSize: 12),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+                gridData: const FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        int v = value.toInt();
+                        if (_activeFilter == 'Hari Ini') {
+                          if (v % 4 == 0) return Text('$v:00', style: const TextStyle(fontSize: 10, color: DashboardColors.outline));
+                          return const Text('');
+                        } else if (_activeFilter == 'Minggu Ini') {
+                          final daysAgo = 6 - v;
+                          if (daysAgo == 0) return const Text('Ini', style: const TextStyle(fontSize: 10, color: DashboardColors.onSurfaceVariant));
+                          if (daysAgo == 1) return const Text('Kmr', style: const TextStyle(fontSize: 10, color: DashboardColors.onSurfaceVariant));
+                          return Text('H-$daysAgo', style: const TextStyle(fontSize: 10, color: DashboardColors.outline));
+                        } else if (_activeFilter == 'Bulan Ini') {
+                          if (v == 1 || v == 15 || v == 31) return Text('$v', style: const TextStyle(fontSize: 10, color: DashboardColors.outline));
+                          return const Text('');
+                        } else {
+                          const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+                          if (v >= 1 && v <= 12) {
+                            if (v % 2 == 1) return Text(months[v-1], style: const TextStyle(fontSize: 10, color: DashboardColors.outline));
+                          }
+                          return const Text('');
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                minX: minX,
+                maxX: maxX,
+                minY: 0,
+                maxY: maxY,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: DashboardColors.secondary,
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: DashboardColors.secondary.withOpacity(0.1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _QuickActionsSection extends StatelessWidget {
   const _QuickActionsSection();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       children: [
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton.icon(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: DashboardColors.secondary,
-              foregroundColor: DashboardColors.onSecondary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        Expanded(
+          child: SizedBox(
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                context.read<BottomNavBloc>().add(const TapBottomNavEvent(2));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DashboardColors.secondary,
+                foregroundColor: DashboardColors.onSecondary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
               ),
-              elevation: 2,
-            ),
-            icon: const Icon(Icons.add_circle),
-            label: const Text(
-              'Penjualan Baru',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              icon: const Icon(Icons.add_circle),
+              label: const FittedBox(
+                child: Text(
+                  'Penjualan Baru',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: DashboardColors.primaryContainer,
-                    foregroundColor: DashboardColors.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  icon: const Icon(Icons.qr_code_scanner),
-                  label: const Text('Pindai'),
+        const SizedBox(width: 16),
+        Expanded(
+          child: SizedBox(
+            height: 56,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                context.read<BottomNavBloc>().add(const TapBottomNavEvent(3));
+              },
+              style: OutlinedButton.styleFrom(
+                backgroundColor: DashboardColors.surfaceContainerHighest,
+                foregroundColor: DashboardColors.onSurfaceVariant,
+                side: const BorderSide(color: DashboardColors.outlineVariant),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: const Text('Inventaris'),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: SizedBox(
-                height: 56,
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: DashboardColors.surfaceContainerHighest,
-                    foregroundColor: DashboardColors.onSurfaceVariant,
-                    side: const BorderSide(color: DashboardColors.outlineVariant),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: const Icon(Icons.inventory_2_outlined),
-                  label: const Text('Inventaris'),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );
@@ -719,6 +937,7 @@ class _LowStockSection extends StatelessWidget {
       for (var p in lowProds) {
         bool isCritical = p.stock == 0;
         items.add(_buildAlertItem(
+          context: context,
           title: p.name,
           status: 'Sisa ${p.stock}',
           isCritical: isCritical,
@@ -765,6 +984,7 @@ class _LowStockSection extends StatelessWidget {
   }
 
   Widget _buildAlertItem({
+    required BuildContext context,
     required String title,
     required String status,
     required bool isCritical,
@@ -782,7 +1002,7 @@ class _LowStockSection extends StatelessWidget {
             width: 8,
             height: 40,
             decoration: BoxDecoration(
-              color: isCritical ? DashboardColors.error : DashboardColors.surfaceDim,
+              color: DashboardColors.error,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -810,13 +1030,18 @@ class _LowStockSection extends StatelessWidget {
                         color: isCritical ? DashboardColors.error : DashboardColors.onSurfaceVariant,
                       ),
                     ),
-                    Text(
-                      'Isi Ulang',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: DashboardColors.secondary,
-                        decoration: TextDecoration.underline,
+                    GestureDetector(
+                      onTap: () {
+                        context.read<BottomNavBloc>().add(const TapBottomNavEvent(3));
+                      },
+                      child: const Text(
+                        'Isi Ulang',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: DashboardColors.secondary,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
                   ],
