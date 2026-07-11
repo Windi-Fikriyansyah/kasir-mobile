@@ -1,12 +1,28 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:kasirsuper/core/core.dart';
-
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
+import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
+import 'package:kasirsuper/features/product/blocs/blocs.dart';
 
 typedef DashboardColors = QuickPOSColors;
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<TransactionBloc>().add(LoadTransactions());
+    context.read<ProductBloc>().add(LoadProducts());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,22 +39,30 @@ class HomePage extends StatelessWidget {
                 color: DashboardColors.surface,
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: const [
-                    _WelcomeSection(),
-              SizedBox(height: 24),
-              _SalesSummarySection(),
-              SizedBox(height: 16),
-              _QuickActionsSection(),
-              SizedBox(height: 24),
-              _BestSellingSection(),
-              SizedBox(height: 24),
-              _LowStockSection(),
-                  ],
+                  child: BlocBuilder<TransactionBloc, TransactionState>(
+                    builder: (context, txState) {
+                      return BlocBuilder<ProductBloc, ProductState>(
+                        builder: (context, prodState) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const _WelcomeSection(),
+                              const SizedBox(height: 24),
+                              _SalesSummarySection(txState: txState),
+                              const SizedBox(height: 16),
+                              const _QuickActionsSection(),
+                              const SizedBox(height: 24),
+                              _BestSellingSection(txState: txState, prodState: prodState),
+                              const SizedBox(height: 24),
+                              _LowStockSection(prodState: prodState),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
             ),
           ],
         ),
@@ -153,10 +177,26 @@ class _WelcomeSection extends StatelessWidget {
 }
 
 class _SalesSummarySection extends StatelessWidget {
-  const _SalesSummarySection();
+  final TransactionState txState;
+  const _SalesSummarySection({required this.txState});
 
   @override
   Widget build(BuildContext context) {
+    double todaySales = 0;
+    int todayCount = 0;
+    if (txState is TransactionLoaded) {
+      final now = DateTime.now();
+      for (var txn in (txState as TransactionLoaded).transactions) {
+        final dt = DateTime.parse(txn.date);
+        if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+          todaySales += txn.totalAmount;
+          todayCount++;
+        }
+      }
+    }
+    double avgSales = todayCount > 0 ? todaySales / todayCount : 0;
+    final formatCurrency = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -181,8 +221,8 @@ class _SalesSummarySection extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
+                  children: [
+                    const Text(
                       "RINGKASAN PENJUALAN HARI INI",
                       style: TextStyle(
                         fontSize: 12,
@@ -191,13 +231,13 @@ class _SalesSummarySection extends StatelessWidget {
                         letterSpacing: 1.0,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Rp 4.829.500',
-                        style: TextStyle(
+                        formatCurrency.format(todaySales),
+                        style: const TextStyle(
                           fontSize: 36,
                           fontWeight: FontWeight.bold,
                           color: DashboardColors.onSurface,
@@ -225,18 +265,18 @@ class _SalesSummarySection extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
+                  children: [
+                    const Text(
                       'Transaksi',
                       style: TextStyle(
                         fontSize: 12,
                         color: DashboardColors.onSurfaceVariant,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      '142',
-                      style: TextStyle(
+                      todayCount.toString(),
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                         color: DashboardColors.onSurface,
@@ -248,21 +288,21 @@ class _SalesSummarySection extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
+                  children: [
+                    const Text(
                       'Rata-rata Belanja',
                       style: TextStyle(
                         fontSize: 12,
                         color: DashboardColors.onSurfaceVariant,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Rp 34.010',
-                        style: TextStyle(
+                        formatCurrency.format(avgSales),
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
                           color: DashboardColors.onSurface,
@@ -374,11 +414,142 @@ class _QuickActionsSection extends StatelessWidget {
   }
 }
 
-class _BestSellingSection extends StatelessWidget {
-  const _BestSellingSection();
+class _BestSellingSection extends StatefulWidget {
+  final TransactionState txState;
+  final ProductState prodState;
+  const _BestSellingSection({required this.txState, required this.prodState});
+
+  @override
+  State<_BestSellingSection> createState() => _BestSellingSectionState();
+}
+
+class _BestSellingSectionState extends State<_BestSellingSection> {
+  String _activeFilter = 'Sepanjang Waktu';
+  bool _isExpanded = false;
+
+  void _showFilterDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Widget buildFilterOption(String label) {
+              return RadioListTile<String>(
+                value: label,
+                groupValue: _activeFilter,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _activeFilter = value;
+                    });
+                    setModalState(() {
+                      _activeFilter = value;
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+                title: Text(label),
+                contentPadding: EdgeInsets.zero,
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Filter Penjualan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  buildFilterOption('Hari Ini'),
+                  buildFilterOption('Minggu Ini'),
+                  buildFilterOption('Bulan Ini'),
+                  buildFilterOption('Sepanjang Waktu'),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          }
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    List<Widget> items = [];
+    if (widget.txState is TransactionLoaded && widget.prodState is ProductLoaded) {
+      Map<int, int> soldCounts = {};
+      final now = DateTime.now();
+      
+      for (var txn in (widget.txState as TransactionLoaded).transactions) {
+        final dt = DateTime.parse(txn.date);
+        bool matchDate = true;
+        if (_activeFilter == 'Hari Ini') {
+          matchDate = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+        } else if (_activeFilter == 'Minggu Ini') {
+          matchDate = now.difference(dt).inDays <= 7;
+        } else if (_activeFilter == 'Bulan Ini') {
+          matchDate = dt.year == now.year && dt.month == now.month;
+        }
+
+        if (matchDate && txn.items != null) {
+          for (var item in txn.items!) {
+            soldCounts[item.productId] = (soldCounts[item.productId] ?? 0) + item.quantity;
+          }
+        }
+      }
+      var sortedIds = soldCounts.keys.toList()..sort((a, b) => soldCounts[b]!.compareTo(soldCounts[a]!));
+      
+      var totalAvailable = sortedIds.length;
+      var limit = _isExpanded ? 10 : 3;
+      var topIds = sortedIds.take(limit).toList();
+      
+      final formatCurrency = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
+
+      for (var id in topIds) {
+        try {
+          var prod = (widget.prodState as ProductLoaded).products.firstWhere((p) => p.id == id);
+          items.add(_buildItem(
+            imagePath: prod.imagePath,
+            title: prod.name,
+            sku: 'SKU: ${prod.sku}',
+            units: '${soldCounts[id]} Terjual',
+            price: formatCurrency.format(prod.price),
+          ));
+          items.add(const SizedBox(height: 12));
+        } catch (_) {}
+      }
+      
+      if (totalAvailable > 3) {
+        items.add(
+          Center(
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  _isExpanded = !_isExpanded;
+                });
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: DashboardColors.secondary,
+              ),
+              child: Text(
+                _isExpanded ? 'Tampilkan Lebih Sedikit' : 'Tampilkan Lebih Banyak (${totalAvailable > 10 ? '10' : totalAvailable})',
+              ),
+            ),
+          )
+        );
+      }
+    }
+
+    if (items.isEmpty) {
+      items.add(const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Text('Belum ada data penjualan', style: TextStyle(color: DashboardColors.outline)),
+      ));
+    }
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -398,8 +569,8 @@ class _BestSellingSection extends StatelessWidget {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'Terlaris',
                 style: TextStyle(
                   fontSize: 20,
@@ -407,46 +578,42 @@ class _BestSellingSection extends StatelessWidget {
                   color: DashboardColors.onSurface,
                 ),
               ),
-              Text(
-                'Minggu Ini',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: DashboardColors.onSurfaceVariant,
-                ),
+              Row(
+                children: [
+                  Text(
+                    _activeFilter,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: DashboardColors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: DashboardColors.surfaceContainerHigh,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.filter_list, size: 16, color: DashboardColors.onSurfaceVariant),
+                      onPressed: _showFilterDialog,
+                      splashRadius: 16,
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(6),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          _buildItem(
-            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC7CcKe24_pGCilrPAMwAIZaEZTHzSKKn45SoX0g0kJaBDBjFXuZTUYxCH4EQuyHCBO7MeMAcj6wZu4bTZyPQHJjtrKtBChD-u6lKlG3CqQ8QKRiZ5HdfLYVlOvOVHDNMb83pFEvNF62qp3amWP0iXwLXpY3_LJIeVVlGejmvrBjkEZ-zynqlTXbOo6QWqEyjHfQ_sIqjnt2QsD7GNZTuDKivgSs5wzm2gFg2OT8YrukNEfvwkDbCt2FQ',
-            title: 'Voss Glass Bottle',
-            sku: 'SKU: VOS-9921',
-            units: '42 Unit',
-            price: 'Rp 1.050.000',
-          ),
-          const SizedBox(height: 12),
-          _buildItem(
-            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDKZYpK0jahLv6AqOMSfRs2WKUBokLBjWjgrApABTI-ISxzJoxRLiobILkvV22Q6fXDqU7uTgzlJiYnYQpac37AIYuxTSeyfF6bAkVs-DLXT7ThtjohI54DsJulCZ9LfwafQVPAiiOv1gzn33DfbpSGOTFarVQVhVK9skvAI9VxE8xpxCWzVig2ZLbgEs5ErgpahGVSXjfSqNQ3THjWoRQG0GVczbEXGa9Q026YwY2Cci-IgBu7MIQRQw',
-            title: 'Dark Roast Blend',
-            sku: 'SKU: COF-1102',
-            units: '38 Unit',
-            price: 'Rp 722.000',
-          ),
-          const SizedBox(height: 12),
-          _buildItem(
-            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCOcLW3Xuwa9PQboQqwfg5OJw6TsCKZF3BxVoqbVMC2foookney2F3ziTy7RJVy1W3ntOLPazo9RVgZwcCVOb4c8yboxY36L5ULF1lWrrIOs38_AiOR39tKdNgPVuQbG6e6HUkNdC1TL91JOKafWoka2mc2jhkTCxG8lYb9cCidTs8PTnARodx80pUVXSb0YkrxMiNTVVQT7A2MWarsPJhu0T9a6W47RRvHm3T7P3Uc6uALkFRX0F3eNw',
-            title: 'Eco Linen Tote',
-            sku: 'SKU: BAG-4581',
-            units: '29 Unit',
-            price: 'Rp 435.000',
-          ),
+          ...items,
         ],
       ),
     );
   }
 
   Widget _buildItem({
-    required String image,
+    String? imagePath,
     required String title,
     required String sku,
     required String units,
@@ -462,12 +629,27 @@ class _BestSellingSection extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              image,
-              width: 48,
-              height: 48,
-              fit: BoxFit.cover,
-            ),
+            child: imagePath != null
+                ? Image.file(
+                    File(imagePath),
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 48,
+                        height: 48,
+                        color: DashboardColors.surfaceContainerHighest,
+                        child: const Icon(Icons.image_not_supported, color: DashboardColors.outline),
+                      );
+                    },
+                  )
+                : Container(
+                    width: 48,
+                    height: 48,
+                    color: DashboardColors.surfaceContainerHighest,
+                    child: const Icon(Icons.image, color: DashboardColors.outline),
+                  ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -524,10 +706,33 @@ class _BestSellingSection extends StatelessWidget {
 }
 
 class _LowStockSection extends StatelessWidget {
-  const _LowStockSection();
+  final ProductState prodState;
+  const _LowStockSection({required this.prodState});
 
   @override
   Widget build(BuildContext context) {
+    List<Widget> items = [];
+    if (prodState is ProductLoaded) {
+      final allProds = (prodState as ProductLoaded).products;
+      final lowProds = allProds.where((p) => p.stock <= p.minStock).take(5).toList();
+      
+      for (var p in lowProds) {
+        bool isCritical = p.stock == 0;
+        items.add(_buildAlertItem(
+          title: p.name,
+          status: 'Sisa ${p.stock}',
+          isCritical: isCritical,
+        ));
+        items.add(const SizedBox(height: 12));
+      }
+    }
+    if (items.isEmpty) {
+      items.add(const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Text('Semua stok aman', style: TextStyle(color: DashboardColors.outline)),
+      ));
+    }
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -543,7 +748,7 @@ class _LowStockSection extends StatelessWidget {
               Icon(Icons.warning_amber_rounded, color: DashboardColors.error),
               SizedBox(width: 8),
               Text(
-                'Stok Menipis',
+                'Peringatan Stok',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
@@ -553,23 +758,7 @@ class _LowStockSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _buildAlertItem(
-            title: 'Almond Milk 1L',
-            status: 'Sisa 2',
-            isCritical: true,
-          ),
-          const SizedBox(height: 12),
-          _buildAlertItem(
-            title: 'Paper Straws (50pk)',
-            status: 'Sisa 5',
-            isCritical: true,
-          ),
-          const SizedBox(height: 12),
-          _buildAlertItem(
-            title: 'Napkins (White)',
-            status: 'Sisa 12',
-            isCritical: false,
-          ),
+          ...items,
         ],
       ),
     );
