@@ -75,10 +75,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final change = amountGiven - total;
     
     final items = posState.items.map((cartItem) => TransactionItemModel(
-      productId: cartItem.product.id!,
-      productName: cartItem.product.name,
-      price: cartItem.product.price.toDouble(),
+      productId: cartItem.id, // Using generic id
+      productName: cartItem.name, // Using generic name
+      price: cartItem.price, // Using generic price
       quantity: cartItem.quantity,
+      itemType: cartItem.itemType, // Using generic itemType
     )).toList();
     
     final transaction = TransactionModel(
@@ -296,20 +297,30 @@ class _OrderSummarySection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item.product.name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: QuickPOSColors.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  children: [
+                    Icon(item.itemType == 'service' ? Icons.handyman : Icons.inventory_2, size: 14, color: QuickPOSColors.outline),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        item.name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: QuickPOSColors.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
                     InkWell(
                       onTap: () {
-                        context.read<PosBloc>().add(RemoveProductFromCart(item.product));
+                        context.read<PosBloc>().add(RemoveItemFromCart(item));
                         Future.delayed(const Duration(milliseconds: 100), () {
                           if (context.mounted && context.read<PosBloc>().state.items.isEmpty) {
                             Navigator.pop(context);
@@ -330,7 +341,17 @@ class _OrderSummarySection extends StatelessWidget {
                     const SizedBox(width: 12),
                     InkWell(
                       onTap: () {
-                        context.read<PosBloc>().add(AddProductToCart(item.product));
+                        if (item.itemType == 'service' || item.quantity < item.product!.stock) {
+                          context.read<PosBloc>().add(AddItemToCart(item));
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Stok habis!'),
+                              backgroundColor: QuickPOSColors.error,
+                              duration: Duration(milliseconds: 1000),
+                            ),
+                          );
+                        }
                       },
                       child: Container(
                         padding: const EdgeInsets.all(2),
@@ -360,7 +381,7 @@ class _OrderSummarySection extends StatelessWidget {
               const SizedBox(height: 8),
               InkWell(
                 onTap: () {
-                  context.read<PosBloc>().add(DeleteProductFromCart(item.product));
+                  context.read<PosBloc>().add(DeleteItemFromCart(item));
                   Future.delayed(const Duration(milliseconds: 100), () {
                     if (context.mounted && context.read<PosBloc>().state.items.isEmpty) {
                       Navigator.pop(context);

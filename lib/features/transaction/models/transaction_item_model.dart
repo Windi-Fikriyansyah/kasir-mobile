@@ -5,6 +5,7 @@ class TransactionItemModel {
   final String productName;
   final double price;
   final int quantity;
+  final String itemType;
 
   TransactionItemModel({
     this.id,
@@ -13,6 +14,7 @@ class TransactionItemModel {
     required this.productName,
     required this.price,
     required this.quantity,
+    this.itemType = 'product',
   });
 
   Map<String, dynamic> toMap() {
@@ -23,6 +25,7 @@ class TransactionItemModel {
       'product_name': productName,
       'price': price,
       'quantity': quantity,
+      'item_type': itemType,
     };
   }
 
@@ -34,6 +37,7 @@ class TransactionItemModel {
       productName: map['product_name'],
       price: (map['price'] as num).toDouble(),
       quantity: map['quantity'],
+      itemType: map['item_type'] ?? 'product',
     );
   }
 }

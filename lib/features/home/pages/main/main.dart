@@ -46,7 +46,7 @@ class MainPage extends StatelessWidget {
               ),
               BottomNavigationBarItem(
                 icon: Icon(AppIcons.product),
-                label: "Produk",
+                label: "Sparepart",
               ),
               BottomNavigationBarItem(
                 icon: Icon(AppIcons.settings),

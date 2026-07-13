@@ -1,4 +1,5 @@
 import 'package:kasirsuper/features/product/models/product_model.dart';
+import 'package:kasirsuper/features/service/models/service_model.dart';
 import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
 import 'package:kasirsuper/features/transaction/models/transaction_item_model.dart';
 import 'package:path/path.dart';
@@ -24,7 +25,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -64,10 +65,22 @@ class DatabaseHelper {
         product_name TEXT,
         price REAL,
         quantity INTEGER,
+        item_type TEXT DEFAULT 'product',
         FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE CASCADE
       )
     ''');
     
+    await db.execute('''
+      CREATE TABLE services(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        sku TEXT,
+        category TEXT,
+        price REAL,
+        description TEXT
+      )
+    ''');
+
     // Insert some initial data
     await db.execute('''
       INSERT INTO products (name, sku, category, price, cost, stock, minStock)
@@ -103,6 +116,20 @@ class DatabaseHelper {
           FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE CASCADE
         )
       ''');
+    }
+
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE services(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT,
+          sku TEXT,
+          category TEXT,
+          price REAL,
+          description TEXT
+        )
+      ''');
+      await db.execute('ALTER TABLE transaction_items ADD COLUMN item_type TEXT DEFAULT "product"');
     }
   }
 
@@ -155,11 +182,13 @@ class DatabaseHelper {
           itemMap['transaction_id'] = transactionId;
           await txn.insert('transaction_items', itemMap);
           
-          // Deduct stock
-          await txn.rawUpdate(
-            'UPDATE products SET stock = stock - ? WHERE id = ?',
-            [item.quantity, item.productId],
-          );
+          // Deduct stock only for products
+          if (item.itemType == 'product') {
+            await txn.rawUpdate(
+              'UPDATE products SET stock = stock - ? WHERE id = ?',
+              [item.quantity, item.productId],
+            );
+          }
         }
       }
     });
@@ -186,5 +215,40 @@ class DatabaseHelper {
     }
     
     return transactions;
+  }
+
+  // CRUD for Services
+  Future<int> insertService(ServiceModel service) async {
+    final db = await database;
+    return await db.insert(
+      'services',
+      service.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<ServiceModel>> getServices() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('services', orderBy: 'id DESC');
+    return List.generate(maps.length, (i) => ServiceModel.fromMap(maps[i]));
+  }
+
+  Future<int> updateService(ServiceModel service) async {
+    final db = await database;
+    return await db.update(
+      'services',
+      service.toMap(),
+      where: 'id = ?',
+      whereArgs: [service.id],
+    );
+  }
+
+  Future<int> deleteService(int id) async {
+    final db = await database;
+    return await db.delete(
+      'services',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

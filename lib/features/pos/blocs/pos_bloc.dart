@@ -10,25 +10,25 @@ abstract class PosEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class AddProductToCart extends PosEvent {
-  final ProductModel product;
-  const AddProductToCart(this.product);
+class AddItemToCart extends PosEvent {
+  final CartItemModel item;
+  const AddItemToCart(this.item);
   @override
-  List<Object?> get props => [product];
+  List<Object?> get props => [item];
 }
 
-class RemoveProductFromCart extends PosEvent {
-  final ProductModel product;
-  const RemoveProductFromCart(this.product);
+class RemoveItemFromCart extends PosEvent {
+  final CartItemModel item;
+  const RemoveItemFromCart(this.item);
   @override
-  List<Object?> get props => [product];
+  List<Object?> get props => [item];
 }
 
-class DeleteProductFromCart extends PosEvent {
-  final ProductModel product;
-  const DeleteProductFromCart(this.product);
+class DeleteItemFromCart extends PosEvent {
+  final CartItemModel item;
+  const DeleteItemFromCart(this.item);
   @override
-  List<Object?> get props => [product];
+  List<Object?> get props => [item];
 }
 
 class ClearCart extends PosEvent {}
@@ -53,34 +53,41 @@ class PosState extends Equatable {
 // --- BLoC ---
 class PosBloc extends Bloc<PosEvent, PosState> {
   PosBloc() : super(const PosState()) {
-    on<AddProductToCart>(_onAddProduct);
-    on<RemoveProductFromCart>(_onRemoveProduct);
-    on<DeleteProductFromCart>(_onDeleteProduct);
+    on<AddItemToCart>(_onAddItem);
+    on<RemoveItemFromCart>(_onRemoveItem);
+    on<DeleteItemFromCart>(_onDeleteItem);
     on<ClearCart>(_onClearCart);
   }
 
-  void _onAddProduct(AddProductToCart event, Emitter<PosState> emit) {
+  void _onAddItem(AddItemToCart event, Emitter<PosState> emit) {
     final updatedItems = List<CartItemModel>.from(state.items);
-    final existingIndex = updatedItems.indexWhere((item) => item.product.id == event.product.id);
+    final existingIndex = updatedItems.indexWhere((i) => i.id == event.item.id && i.itemType == event.item.itemType);
 
     if (existingIndex >= 0) {
       final existingItem = updatedItems[existingIndex];
-      // Check stock
-      if (existingItem.quantity < event.product.stock) {
+      // Check stock if product
+      if (existingItem.itemType == 'product') {
+        if (existingItem.quantity < existingItem.product!.stock) {
+          updatedItems[existingIndex] = existingItem.copyWith(quantity: existingItem.quantity + 1);
+        }
+      } else {
+        // Services have unlimited stock
         updatedItems[existingIndex] = existingItem.copyWith(quantity: existingItem.quantity + 1);
       }
     } else {
-      if (event.product.stock > 0) {
-        updatedItems.add(CartItemModel(product: event.product));
+      if (event.item.itemType == 'product' && event.item.product!.stock <= 0) {
+        // Cannot add out of stock product
+      } else {
+        updatedItems.add(event.item);
       }
     }
 
     emit(state.copyWith(items: updatedItems));
   }
 
-  void _onRemoveProduct(RemoveProductFromCart event, Emitter<PosState> emit) {
+  void _onRemoveItem(RemoveItemFromCart event, Emitter<PosState> emit) {
     final updatedItems = List<CartItemModel>.from(state.items);
-    final existingIndex = updatedItems.indexWhere((item) => item.product.id == event.product.id);
+    final existingIndex = updatedItems.indexWhere((i) => i.id == event.item.id && i.itemType == event.item.itemType);
 
     if (existingIndex >= 0) {
       final existingItem = updatedItems[existingIndex];
@@ -93,9 +100,9 @@ class PosBloc extends Bloc<PosEvent, PosState> {
     }
   }
 
-  void _onDeleteProduct(DeleteProductFromCart event, Emitter<PosState> emit) {
+  void _onDeleteItem(DeleteItemFromCart event, Emitter<PosState> emit) {
     final updatedItems = List<CartItemModel>.from(state.items);
-    updatedItems.removeWhere((item) => item.product.id == event.product.id);
+    updatedItems.removeWhere((i) => i.id == event.item.id && i.itemType == event.item.itemType);
     emit(state.copyWith(items: updatedItems));
   }
 

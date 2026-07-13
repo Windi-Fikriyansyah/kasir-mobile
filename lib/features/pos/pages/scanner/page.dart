@@ -6,6 +6,7 @@ import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/pos/blocs/pos_bloc.dart';
 import 'package:kasirsuper/features/pos/pages/checkout/page.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
+import 'package:kasirsuper/features/pos/models/cart_item_model.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class ScannerPage extends StatefulWidget {
@@ -55,7 +56,7 @@ class _ScannerPageState extends State<ScannerPage> {
             } catch (_) {}
             HapticFeedback.vibrate();
 
-            context.read<PosBloc>().add(AddProductToCart(matchedProduct));
+            context.read<PosBloc>().add(AddItemToCart(CartItemModel(product: matchedProduct, itemType: 'product')));
             
             ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(

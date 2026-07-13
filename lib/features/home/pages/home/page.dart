@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:fl_chart/fl_chart.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -7,7 +7,9 @@ import 'package:kasirsuper/core/core.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
+import 'package:kasirsuper/features/service/blocs/blocs.dart';
 import 'package:kasirsuper/features/home/home.dart';
+import 'package:kasirsuper/features/service/pages/index/page.dart';
 
 typedef DashboardColors = QuickPOSColors;
 
@@ -24,6 +26,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     context.read<TransactionBloc>().add(LoadTransactions());
     context.read<ProductBloc>().add(LoadProducts());
+    context.read<ServiceBloc>().add(LoadServices());
   }
 
   @override
@@ -45,19 +48,23 @@ class _HomePageState extends State<HomePage> {
                     builder: (context, txState) {
                       return BlocBuilder<ProductBloc, ProductState>(
                         builder: (context, prodState) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _SalesSummarySection(txState: txState),
-                              const SizedBox(height: 16),
-                              _SalesChartSection(txState: txState),
-                              const SizedBox(height: 16),
-                              const _QuickActionsSection(),
-                              const SizedBox(height: 24),
-                              _BestSellingSection(txState: txState, prodState: prodState),
-                              const SizedBox(height: 24),
-                              _LowStockSection(prodState: prodState),
-                            ],
+                          return BlocBuilder<ServiceBloc, ServiceState>(
+                            builder: (context, serviceState) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _SalesSummarySection(txState: txState),
+                                  const SizedBox(height: 16),
+                                  const _MenuGridSection(),
+                                  const SizedBox(height: 16),
+                                  const _QuickActionsSection(),
+                                  const SizedBox(height: 24),
+                                  _BestSellingSection(txState: txState, prodState: prodState, serviceState: serviceState),
+                                  const SizedBox(height: 24),
+                                  _LowStockSection(prodState: prodState),
+                                ],
+                              );
+                            },
                           );
                         },
                       );
@@ -275,156 +282,11 @@ class _SalesSummarySection extends StatelessWidget {
   }
 }
 
-class _SalesChartSection extends StatefulWidget {
-  final TransactionState txState;
-  const _SalesChartSection({required this.txState});
-
-  @override
-  State<_SalesChartSection> createState() => _SalesChartSectionState();
-}
-
-class _SalesChartSectionState extends State<_SalesChartSection> {
-  String _activeFilter = 'Minggu Ini';
-  String _activeTab = 'Pendapatan';
-
-  void _showFilterDialog() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            Widget buildFilterOption(String label) {
-              return RadioListTile<String>(
-                value: label,
-                groupValue: _activeFilter,
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _activeFilter = value;
-                    });
-                    setModalState(() {
-                      _activeFilter = value;
-                    });
-                    Navigator.pop(context);
-                  }
-                },
-                title: Text(label),
-                contentPadding: EdgeInsets.zero,
-              );
-            }
-
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Filter Waktu', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  buildFilterOption('Hari Ini'),
-                  buildFilterOption('Minggu Ini'),
-                  buildFilterOption('Bulan Ini'),
-                  buildFilterOption('Sepanjang Waktu'),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            );
-          }
-        );
-      },
-    );
-  }
-
-  Widget _buildTab(String label) {
-    bool isActive = _activeTab == label;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _activeTab = label;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive ? DashboardColors.primaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: isActive ? DashboardColors.onPrimary : DashboardColors.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-  }
+class _MenuGridSection extends StatelessWidget {
+  const _MenuGridSection();
 
   @override
   Widget build(BuildContext context) {
-    List<FlSpot> spots = [];
-    double maxY = 10;
-    double minX = 0;
-    double maxX = 6;
-    
-    if (widget.txState is TransactionLoaded) {
-      final now = DateTime.now();
-      Map<int, double> dataMap = {};
-      
-      if (_activeFilter == 'Hari Ini') {
-        minX = 0; maxX = 23;
-      } else if (_activeFilter == 'Minggu Ini') {
-        minX = 0; maxX = 6;
-      } else if (_activeFilter == 'Bulan Ini') {
-        minX = 1; maxX = 31;
-      } else if (_activeFilter == 'Sepanjang Waktu') {
-        minX = 1; maxX = 12;
-      }
-      
-      for (var txn in (widget.txState as TransactionLoaded).transactions) {
-        final dt = DateTime.parse(txn.date);
-        
-        double valueToAdd = 0;
-        if (_activeTab == 'Pendapatan') {
-          valueToAdd = txn.totalAmount;
-        } else {
-          if (txn.items != null) {
-            valueToAdd = txn.items!.fold(0.0, (sum, item) => sum + item.quantity);
-          }
-        }
-        
-        if (_activeFilter == 'Hari Ini') {
-          if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
-             dataMap[dt.hour] = (dataMap[dt.hour] ?? 0) + valueToAdd;
-          }
-        } else if (_activeFilter == 'Minggu Ini') {
-          final diff = now.difference(dt).inDays;
-          if (diff <= 6 && diff >= 0) {
-             int index = 6 - diff;
-             dataMap[index] = (dataMap[index] ?? 0) + valueToAdd;
-          }
-        } else if (_activeFilter == 'Bulan Ini') {
-          if (dt.year == now.year && dt.month == now.month) {
-             dataMap[dt.day] = (dataMap[dt.day] ?? 0) + valueToAdd;
-          }
-        } else if (_activeFilter == 'Sepanjang Waktu') {
-          if (dt.year == now.year) {
-             dataMap[dt.month] = (dataMap[dt.month] ?? 0) + valueToAdd;
-          }
-        }
-      }
-      
-      for (int i = minX.toInt(); i <= maxX.toInt(); i++) {
-        double val = dataMap[i] ?? 0;
-        spots.add(FlSpot(i.toDouble(), val));
-        if (val > maxY) maxY = val * 1.2;
-      }
-    } else {
-      spots = const [FlSpot(0, 0), FlSpot(1, 0), FlSpot(2, 0), FlSpot(3, 0), FlSpot(4, 0), FlSpot(5, 0), FlSpot(6, 0)];
-    }
-
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -442,133 +304,84 @@ class _SalesChartSectionState extends State<_SalesChartSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Tren Penjualan',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: DashboardColors.onSurface,
-                ),
-              ),
-              Row(
-                children: [
-                  Text(
-                    _activeFilter,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: DashboardColors.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: DashboardColors.surfaceContainerHigh,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.filter_list, size: 16, color: DashboardColors.onSurfaceVariant),
-                      onPressed: _showFilterDialog,
-                      splashRadius: 16,
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.all(6),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildTab('Pendapatan'),
-              const SizedBox(width: 8),
-              _buildTab('Unit'),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 200,
-            child: LineChart(
-              LineChartData(
-                lineTouchData: LineTouchData(
-                  touchTooltipData: LineTouchTooltipData(
-                    getTooltipColor: (touchedSpot) => Colors.white,
-                    getTooltipItems: (touchedSpots) {
-                      return touchedSpots.map((LineBarSpot touchedSpot) {
-                        final val = touchedSpot.y;
-                        String text = '';
-                        if (_activeTab == 'Pendapatan') {
-                          text = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0).format(val);
-                        } else {
-                          text = val.toInt().toString();
-                        }
-                        return LineTooltipItem(
-                          text,
-                          const TextStyle(color: DashboardColors.onSurface, fontWeight: FontWeight.bold, fontSize: 12),
-                        );
-                      }).toList();
-                    },
-                  ),
-                ),
-                gridData: const FlGridData(show: false),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        int v = value.toInt();
-                        if (_activeFilter == 'Hari Ini') {
-                          if (v % 4 == 0) return Text('$v:00', style: const TextStyle(fontSize: 10, color: DashboardColors.outline));
-                          return const Text('');
-                        } else if (_activeFilter == 'Minggu Ini') {
-                          final daysAgo = 6 - v;
-                          if (daysAgo == 0) return const Text('Ini', style: const TextStyle(fontSize: 10, color: DashboardColors.onSurfaceVariant));
-                          if (daysAgo == 1) return const Text('Kmr', style: const TextStyle(fontSize: 10, color: DashboardColors.onSurfaceVariant));
-                          return Text('H-$daysAgo', style: const TextStyle(fontSize: 10, color: DashboardColors.outline));
-                        } else if (_activeFilter == 'Bulan Ini') {
-                          if (v == 1 || v == 15 || v == 31) return Text('$v', style: const TextStyle(fontSize: 10, color: DashboardColors.outline));
-                          return const Text('');
-                        } else {
-                          const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
-                          if (v >= 1 && v <= 12) {
-                            if (v % 2 == 1) return Text(months[v-1], style: const TextStyle(fontSize: 10, color: DashboardColors.outline));
-                          }
-                          return const Text('');
-                        }
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                minX: minX,
-                maxX: maxX,
-                minY: 0,
-                maxY: maxY,
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    color: DashboardColors.secondary,
-                    barWidth: 3,
-                    isStrokeCapRound: true,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: DashboardColors.secondary.withOpacity(0.1),
-                    ),
-                  ),
-                ],
-              ),
+          const Text(
+            'Menu Utama',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: DashboardColors.onSurface,
             ),
           ),
+          const SizedBox(height: 16),
+          GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 0.65,
+            children: [
+              _buildMenuItem(context, Icons.point_of_sale, 'POS', DashboardColors.primary, () {
+                context.read<BottomNavBloc>().add(const TapBottomNavEvent(2));
+              }),
+              _buildMenuItem(context, Icons.build_circle_outlined, 'Sparepart', DashboardColors.secondary, () {
+                context.read<BottomNavBloc>().add(const TapBottomNavEvent(3));
+              }),
+              _buildMenuItem(context, Icons.handyman, 'Service', Colors.teal, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ServiceListPage()),
+                );
+              }),
+              _buildMenuItem(context, Icons.history, 'Riwayat', Colors.orange, () {
+                context.read<BottomNavBloc>().add(const TapBottomNavEvent(1));
+              }),
+              _buildMenuItem(context, Icons.people, 'Pelanggan', Colors.blue, () {}),
+              _buildMenuItem(context, Icons.bar_chart, 'Laporan', Colors.purple, () {}),
+              _buildMenuItem(context, Icons.settings, 'Pengaturan', Colors.grey, () {
+                context.read<BottomNavBloc>().add(const TapBottomNavEvent(4));
+              }),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(4.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: DashboardColors.onSurface,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -635,7 +448,8 @@ class _QuickActionsSection extends StatelessWidget {
 class _BestSellingSection extends StatefulWidget {
   final TransactionState txState;
   final ProductState prodState;
-  const _BestSellingSection({required this.txState, required this.prodState});
+  final ServiceState serviceState;
+  const _BestSellingSection({required this.txState, required this.prodState, required this.serviceState});
 
   @override
   State<_BestSellingSection> createState() => _BestSellingSectionState();
@@ -696,9 +510,12 @@ class _BestSellingSectionState extends State<_BestSellingSection> {
 
   @override
   Widget build(BuildContext context) {
-    List<Widget> items = [];
-    if (widget.txState is TransactionLoaded && widget.prodState is ProductLoaded) {
-      Map<int, int> soldCounts = {};
+    List<Widget> productItems = [];
+    List<Widget> serviceItems = [];
+
+    if (widget.txState is TransactionLoaded && widget.prodState is ProductLoaded && widget.serviceState is ServiceLoaded) {
+      Map<int, int> soldProducts = {};
+      Map<int, int> soldServices = {};
       final now = DateTime.now();
       
       for (var txn in (widget.txState as TransactionLoaded).transactions) {
@@ -714,34 +531,55 @@ class _BestSellingSectionState extends State<_BestSellingSection> {
 
         if (matchDate && txn.items != null) {
           for (var item in txn.items!) {
-            soldCounts[item.productId] = (soldCounts[item.productId] ?? 0) + item.quantity;
+            if (item.itemType == 'service') {
+              soldServices[item.productId] = (soldServices[item.productId] ?? 0) + item.quantity;
+            } else {
+              soldProducts[item.productId] = (soldProducts[item.productId] ?? 0) + item.quantity;
+            }
           }
         }
       }
-      var sortedIds = soldCounts.keys.toList()..sort((a, b) => soldCounts[b]!.compareTo(soldCounts[a]!));
+
+      var sortedProductIds = soldProducts.keys.toList()..sort((a, b) => soldProducts[b]!.compareTo(soldProducts[a]!));
+      var sortedServiceIds = soldServices.keys.toList()..sort((a, b) => soldServices[b]!.compareTo(soldServices[a]!));
       
-      var totalAvailable = sortedIds.length;
       var limit = _isExpanded ? 10 : 3;
-      var topIds = sortedIds.take(limit).toList();
+      var topProductIds = sortedProductIds.take(limit).toList();
+      var topServiceIds = sortedServiceIds.take(limit).toList();
       
       final formatCurrency = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
 
-      for (var id in topIds) {
+      for (var id in topProductIds) {
         try {
           var prod = (widget.prodState as ProductLoaded).products.firstWhere((p) => p.id == id);
-          items.add(_buildItem(
+          productItems.add(_buildItem(
             imagePath: prod.imagePath,
             title: prod.name,
             sku: 'SKU: ${prod.sku}',
-            units: '${soldCounts[id]} Terjual',
+            units: '${soldProducts[id]} Terjual',
             price: formatCurrency.format(prod.price),
           ));
-          items.add(const SizedBox(height: 12));
+          productItems.add(const SizedBox(height: 12));
+        } catch (_) {}
+      }
+
+      for (var id in topServiceIds) {
+        try {
+          var srv = (widget.serviceState as ServiceLoaded).services.firstWhere((s) => s.id == id);
+          serviceItems.add(_buildItem(
+            imagePath: null,
+            title: srv.name,
+            sku: 'Service',
+            units: '${soldServices[id]} Order',
+            price: formatCurrency.format(srv.price),
+          ));
+          serviceItems.add(const SizedBox(height: 12));
         } catch (_) {}
       }
       
+      int totalAvailable = sortedProductIds.length > sortedServiceIds.length ? sortedProductIds.length : sortedServiceIds.length;
       if (totalAvailable > 3) {
-        items.add(
+        productItems.add(
           Center(
             child: TextButton(
               onPressed: () {
@@ -761,8 +599,8 @@ class _BestSellingSectionState extends State<_BestSellingSection> {
       }
     }
 
-    if (items.isEmpty) {
-      items.add(const Padding(
+    if (productItems.isEmpty && serviceItems.isEmpty) {
+      productItems.add(const Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
         child: Text('Belum ada data penjualan', style: TextStyle(color: DashboardColors.outline)),
       ));
@@ -824,7 +662,31 @@ class _BestSellingSectionState extends State<_BestSellingSection> {
             ],
           ),
           const SizedBox(height: 16),
-          ...items,
+          if (productItems.isNotEmpty) ...[
+            const Text(
+              'Sparepart',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: DashboardColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...productItems,
+          ],
+          if (serviceItems.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Service',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: DashboardColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...serviceItems,
+          ],
         ],
       ),
     );

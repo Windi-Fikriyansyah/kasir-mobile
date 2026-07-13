@@ -13,6 +13,6 @@ void main() {
     ),
   );
   // Observer digunakan untuk melihat perubahan ketika ada perubahan di bloc
-  Bloc.observer = AppBlocObserver();
+  Bloc.observer = AppBlocObserver();  
   runApp(const MyApp());
 }

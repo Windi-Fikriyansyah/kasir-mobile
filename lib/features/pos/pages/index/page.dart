@@ -8,6 +8,9 @@ import 'package:kasirsuper/features/pos/pages/checkout/page.dart';
 import 'package:kasirsuper/features/pos/pages/scanner/page.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/product/models/product_model.dart';
+import 'package:kasirsuper/features/service/blocs/blocs.dart';
+import 'package:kasirsuper/features/service/models/service_model.dart';
+import 'package:kasirsuper/features/pos/models/cart_item_model.dart';
 
 class POSPage extends StatefulWidget {
   const POSPage({super.key});
@@ -19,6 +22,7 @@ class POSPage extends StatefulWidget {
 class _POSPageState extends State<POSPage> {
   String activeCategory = 'Semua Item';
   String searchQuery = '';
+  String activeTab = 'Sparepart'; // 'Sparepart' or 'Service'
 
   void filterCategory(String category) {
     setState(() {
@@ -46,26 +50,74 @@ class _POSPageState extends State<POSPage> {
                 child: Column(
                   children: [
                     _SearchBarSection(onChanged: onSearchChanged),
-                    BlocBuilder<ProductBloc, ProductState>(
-                      builder: (context, state) {
-                        List<String> categories = ['Semua Item'];
-                        if (state is ProductLoaded) {
-                          final uniqueCategories = state.products.map((p) => p.category).toSet().toList();
-                          uniqueCategories.removeWhere((c) => c.trim().isEmpty || c == 'Semua Item');
-                          uniqueCategories.sort();
-                          categories.addAll(uniqueCategories);
-                        }
-                        return _CategoryChips(
-                          categories: categories,
-                          activeCategory: activeCategory,
-                          onCategoryTap: filterCategory,
-                        );
-                      },
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setState(() { activeTab = 'Sparepart'; activeCategory = 'Semua Item'; }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                border: Border(bottom: BorderSide(color: activeTab == 'Sparepart' ? QuickPOSColors.primary : Colors.transparent, width: 2)),
+                              ),
+                              child: Text('Sparepart', textAlign: TextAlign.center, style: TextStyle(fontWeight: activeTab == 'Sparepart' ? FontWeight.bold : FontWeight.normal, color: activeTab == 'Sparepart' ? QuickPOSColors.primary : QuickPOSColors.outline)),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setState(() { activeTab = 'Service'; activeCategory = 'Semua Item'; }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                border: Border(bottom: BorderSide(color: activeTab == 'Service' ? QuickPOSColors.primary : Colors.transparent, width: 2)),
+                              ),
+                              child: Text('Service', textAlign: TextAlign.center, style: TextStyle(fontWeight: activeTab == 'Service' ? FontWeight.bold : FontWeight.normal, color: activeTab == 'Service' ? QuickPOSColors.primary : QuickPOSColors.outline)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 12),
+                    if (activeTab == 'Sparepart')
+                      BlocBuilder<ProductBloc, ProductState>(
+                        builder: (context, state) {
+                          List<String> categories = ['Semua Item'];
+                          if (state is ProductLoaded) {
+                            final uniqueCategories = state.products.map((p) => p.category).toSet().toList();
+                            uniqueCategories.removeWhere((c) => c.trim().isEmpty || c == 'Semua Item');
+                            uniqueCategories.sort();
+                            categories.addAll(uniqueCategories);
+                          }
+                          return _CategoryChips(
+                            categories: categories,
+                            activeCategory: activeCategory,
+                            onCategoryTap: filterCategory,
+                          );
+                        },
+                      ),
+                    if (activeTab == 'Service')
+                      BlocBuilder<ServiceBloc, ServiceState>(
+                        builder: (context, state) {
+                          List<String> categories = ['Semua Item'];
+                          if (state is ServiceLoaded) {
+                            final uniqueCategories = state.services.map((s) => s.category).toSet().toList();
+                            uniqueCategories.removeWhere((c) => c.trim().isEmpty || c == 'Semua Item');
+                            uniqueCategories.sort();
+                            categories.addAll(uniqueCategories);
+                          }
+                          return _CategoryChips(
+                            categories: categories,
+                            activeCategory: activeCategory,
+                            onCategoryTap: filterCategory,
+                          );
+                        },
+                      ),
                     Expanded(
                       child: _ProductGrid(
                         activeCategory: activeCategory,
                         searchQuery: searchQuery,
+                        activeTab: activeTab,
                       ),
                     ),
                   ],
@@ -214,79 +266,126 @@ class _CategoryChips extends StatelessWidget {
 class _ProductGrid extends StatelessWidget {
   final String activeCategory;
   final String searchQuery;
+  final String activeTab;
 
   const _ProductGrid({
     required this.activeCategory,
     required this.searchQuery,
+    required this.activeTab,
   });
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<ProductBloc, ProductState>(
-      builder: (context, state) {
-        if (state is ProductLoading) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (state is ProductLoaded) {
-          final filteredProducts = state.products.where((p) {
-            final matchesCategory = activeCategory == 'Semua Item' || p.category == activeCategory;
-            final matchesSearch = p.name.toLowerCase().contains(searchQuery.toLowerCase()) || 
-                                  p.sku.toLowerCase().contains(searchQuery.toLowerCase());
-            return matchesCategory && matchesSearch;
-          }).toList();
+    if (activeTab == 'Sparepart') {
+      return BlocBuilder<ProductBloc, ProductState>(
+        builder: (context, state) {
+          if (state is ProductLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is ProductLoaded) {
+            final filteredProducts = state.products.where((p) {
+              final matchesCategory = activeCategory == 'Semua Item' || p.category == activeCategory;
+              final matchesSearch = p.name.toLowerCase().contains(searchQuery.toLowerCase()) || 
+                                    p.sku.toLowerCase().contains(searchQuery.toLowerCase());
+              return matchesCategory && matchesSearch;
+            }).toList();
 
-          if (filteredProducts.isEmpty) {
-            return const Center(
-              child: Text('Tidak ada produk', style: TextStyle(color: QuickPOSColors.outline)),
-            );
-          }
-
-          return GridView.builder(
-            padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 32),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.65,
-            ),
-            itemCount: filteredProducts.length,
-            itemBuilder: (context, index) {
-              final product = filteredProducts[index];
-              final isOut = product.stock == 0;
-              final isLow = product.stock > 0 && product.stock <= product.minStock;
-              
-              String? tag;
-              Color? tagColor;
-              Color? tagTextColor;
-              
-              if (isOut) {
-                tag = 'Habis';
-                tagColor = QuickPOSColors.error;
-                tagTextColor = Colors.white;
-              } else if (isLow) {
-                tag = 'Menipis';
-                tagColor = QuickPOSColors.errorContainer;
-                tagTextColor = QuickPOSColors.onErrorContainer;
-              } else {
-                tag = 'Tersedia';
-                tagColor = QuickPOSColors.secondaryContainer;
-                tagTextColor = QuickPOSColors.onSecondaryContainer;
-              }
-
-              return _buildProductCard(
-                context: context,
-                product: product,
-                tag: tag,
-                tagColor: tagColor,
-                tagTextColor: tagTextColor,
+            if (filteredProducts.isEmpty) {
+              return const Center(
+                child: Text('Tidak ada produk', style: TextStyle(color: QuickPOSColors.outline)),
               );
-            },
-          );
-        } else if (state is ProductError) {
-          return Center(child: Text(state.message, style: const TextStyle(color: QuickPOSColors.error)));
-        }
-        return const SizedBox();
-      },
-    );
+            }
+
+            return GridView.builder(
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 32),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.65,
+              ),
+              itemCount: filteredProducts.length,
+              itemBuilder: (context, index) {
+                final product = filteredProducts[index];
+                final isOut = product.stock == 0;
+                final isLow = product.stock > 0 && product.stock <= product.minStock;
+                
+                String? tag;
+                Color? tagColor;
+                Color? tagTextColor;
+                
+                if (isOut) {
+                  tag = 'Habis';
+                  tagColor = QuickPOSColors.error;
+                  tagTextColor = Colors.white;
+                } else if (isLow) {
+                  tag = 'Menipis';
+                  tagColor = QuickPOSColors.errorContainer;
+                  tagTextColor = QuickPOSColors.onErrorContainer;
+                } else {
+                  tag = 'Tersedia';
+                  tagColor = QuickPOSColors.secondaryContainer;
+                  tagTextColor = QuickPOSColors.onSecondaryContainer;
+                }
+
+                return _buildProductCard(
+                  context: context,
+                  product: product,
+                  tag: tag,
+                  tagColor: tagColor,
+                  tagTextColor: tagTextColor,
+                );
+              },
+            );
+          } else if (state is ProductError) {
+            return Center(child: Text(state.message, style: const TextStyle(color: QuickPOSColors.error)));
+          }
+          return const SizedBox();
+        },
+      );
+    } else {
+      return BlocBuilder<ServiceBloc, ServiceState>(
+        builder: (context, state) {
+          if (state is ServiceLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is ServiceLoaded) {
+            final filteredServices = state.services.where((s) {
+              final matchesCategory = activeCategory == 'Semua Item' || s.category == activeCategory;
+              final matchesSearch = s.name.toLowerCase().contains(searchQuery.toLowerCase()) || 
+                                    (s.sku != null && s.sku!.toLowerCase().contains(searchQuery.toLowerCase()));
+              return matchesCategory && matchesSearch;
+            }).toList();
+
+            if (filteredServices.isEmpty) {
+              return const Center(
+                child: Text('Tidak ada service', style: TextStyle(color: QuickPOSColors.outline)),
+              );
+            }
+
+            return GridView.builder(
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 32),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.65,
+              ),
+              itemCount: filteredServices.length,
+              itemBuilder: (context, index) {
+                final service = filteredServices[index];
+
+                return _buildServiceCard(
+                  context: context,
+                  service: service,
+                );
+              },
+            );
+          } else if (state is ServiceError) {
+            return Center(child: Text(state.message, style: const TextStyle(color: QuickPOSColors.error)));
+          }
+          return const SizedBox();
+        },
+      );
+    }
   }
 
   Widget _buildProductCard({
@@ -399,7 +498,7 @@ class _ProductGrid extends StatelessWidget {
                     InkWell(
                       onTap: () {
                         if (product.stock > 0) {
-                          context.read<PosBloc>().add(AddProductToCart(product));
+                          context.read<PosBloc>().add(AddItemToCart(CartItemModel(product: product, itemType: 'product')));
                           ScaffoldMessenger.of(context).clearSnackBars();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -428,6 +527,119 @@ class _ProductGrid extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(Icons.add, color: product.stock > 0 ? QuickPOSColors.onPrimary : QuickPOSColors.outline, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceCard({
+    required BuildContext context,
+    required ServiceModel service,
+  }) {
+    final formattedPrice = NumberFormat.currency(
+      locale: 'id',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    ).format(service.price);
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: QuickPOSColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: QuickPOSColors.primaryContainer,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: const Icon(Icons.handyman, size: 64, color: QuickPOSColors.primary),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  service.category.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: QuickPOSColors.outline,
+                    letterSpacing: 1.0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  service.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: QuickPOSColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        formattedPrice,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: QuickPOSColors.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () {
+                        context.read<PosBloc>().add(AddItemToCart(CartItemModel(service: service, itemType: 'service')));
+                        ScaffoldMessenger.of(context).clearSnackBars();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${service.name} ditambahkan ke keranjang!'),
+                            duration: const Duration(milliseconds: 1500),
+                            backgroundColor: QuickPOSColors.secondary,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: const BoxDecoration(
+                          color: QuickPOSColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.add, color: QuickPOSColors.onPrimary, size: 18),
                       ),
                     ),
                   ],

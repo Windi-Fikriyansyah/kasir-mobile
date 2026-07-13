@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kasirsuper/core/core.dart';
 import 'package:kasirsuper/features/settings/settings.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
+import 'package:kasirsuper/features/report/pages/index/page.dart';
 
 part 'sections/profile_section.dart';
 
@@ -65,6 +66,28 @@ class SettingPage extends StatelessWidget {
                           title: 'Atur Struk',
                           icon: AppIcons.coupon,
                           onTap: () {},
+                        ),
+                      ],
+                    ),
+                    const Divider(
+                      thickness: Dimens.dp8,
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(Dimens.dp16),
+                          child: RegularText.semiBold('Laporan & Analisis'),
+                        ),
+                        ItemMenuSetting(
+                          title: 'Laporan Penjualan',
+                          icon: Icons.pie_chart,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const ReportPage()),
+                            );
+                          },
                         ),
                       ],
                     ),
