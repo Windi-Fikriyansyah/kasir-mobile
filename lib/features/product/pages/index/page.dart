@@ -78,30 +78,26 @@ class _ProductPageState extends State<ProductPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: QuickPOSColors.surface,
+      appBar: AppBar(
+        title: const Text('Data Sparepart'),
+        backgroundColor: Colors.white,
+        foregroundColor: QuickPOSColors.onSurface,
+        elevation: 0,
+      ),
       body: SafeArea(
-        child: Column(
-          children: [
-            const _ProductAppBar(),
-            Expanded(
-              child: Container(
-                color: QuickPOSColors.surface,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 80),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildHeroSection(),
-                    const SizedBox(height: 24),
-                    _buildSearchAndFilters(),
-                    const SizedBox(height: 16),
-                    _buildProductList(),
-                  ],
-                ),
-              ),
-            ),
-            ),
-          ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 80),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeroSection(),
+              const SizedBox(height: 24),
+              _buildSearchAndFilters(),
+              const SizedBox(height: 16),
+              _buildProductList(),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -428,8 +424,6 @@ class _ProductPageState extends State<ProductPage> {
     final isLow = product.stock > 0 && product.stock <= product.minStock;
     final stockStatus = isOut ? 'Stok Habis' : (isLow ? 'Stok Menipis' : 'Tersedia');
     final stockCount = isOut ? 'STOK HABIS' : (isLow ? 'Sisa ${product.stock}' : '${product.stock} Tersedia');
-    final imageUrl = product.imagePath ?? 'https://via.placeholder.com/64';
-
     return Dismissible(
       key: Key(product.id.toString()),
       direction: DismissDirection.endToStart,
@@ -508,19 +502,37 @@ class _ProductPageState extends State<ProductPage> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   clipBehavior: Clip.hardEdge,
-                  child: isOut
-                      ? ColorFiltered(
-                          colorFilter: const ColorFilter.mode(
-                            Colors.grey,
-                            BlendMode.saturation,
-                          ),
-                          child: imageUrl.startsWith('http')
-                              ? Image.network(imageUrl, fit: BoxFit.cover)
-                              : Image.file(File(imageUrl), fit: BoxFit.cover),
-                        )
-                      : (imageUrl.startsWith('http')
-                          ? Image.network(imageUrl, fit: BoxFit.cover)
-                          : Image.file(File(imageUrl), fit: BoxFit.cover)),
+                  child: product.imagePath != null
+                      ? (isOut
+                          ? ColorFiltered(
+                              colorFilter: const ColorFilter.mode(
+                                Colors.grey,
+                                BlendMode.saturation,
+                              ),
+                              child: product.imagePath!.startsWith('http')
+                                  ? Image.network(
+                                      product.imagePath!, 
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2, color: QuickPOSColors.outlineVariant, size: 32),
+                                    )
+                                  : Image.file(
+                                      File(product.imagePath!), 
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2, color: QuickPOSColors.outlineVariant, size: 32),
+                                    ),
+                            )
+                          : (product.imagePath!.startsWith('http')
+                              ? Image.network(
+                                  product.imagePath!, 
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2, color: QuickPOSColors.outlineVariant, size: 32),
+                                )
+                              : Image.file(
+                                  File(product.imagePath!), 
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2, color: QuickPOSColors.outlineVariant, size: 32),
+                                )))
+                      : const Icon(Icons.inventory_2, color: QuickPOSColors.outlineVariant, size: 32),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -546,7 +558,9 @@ class _ProductPageState extends State<ProductPage> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              product.sku,
+                              product.sparepartCode != null && product.sparepartCode!.isNotEmpty 
+                                  ? '\${product.sparepartCode} • \${product.sku}' 
+                                  : product.sku,
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontFamily: 'JetBrains Mono',
@@ -622,39 +636,6 @@ class _ProductPageState extends State<ProductPage> {
       ),
     ),
     ),
-    );
-  }
-}
-
-class _ProductAppBar extends StatelessWidget {
-  const _ProductAppBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.storefront, color: QuickPOSColors.primary),
-              SizedBox(width: 8),
-              Text(
-                'QuickPOS',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: QuickPOSColors.onSurface,
-                ),
-              ),
-            ],
-          ),
-          const NotificationBell(),
-        ],
-      ),
     );
   }
 }

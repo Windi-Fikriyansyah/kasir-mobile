@@ -8,6 +8,7 @@ class ProductModel {
   final int stock;
   final int minStock;
   final String? imagePath;
+  final String? sparepartCode;
 
   ProductModel({
     this.id,
@@ -19,6 +20,7 @@ class ProductModel {
     required this.stock,
     required this.minStock,
     this.imagePath,
+    this.sparepartCode,
   });
 
   ProductModel copyWith({
@@ -56,6 +58,7 @@ class ProductModel {
       'stock': stock,
       'minStock': minStock,
       'imagePath': imagePath,
+      'sparepart_code': sparepartCode,
     };
   }
 
@@ -70,6 +73,7 @@ class ProductModel {
       stock: map['stock']?.toInt() ?? 0,
       minStock: map['minStock']?.toInt() ?? 0,
       imagePath: map['imagePath'],
+      sparepartCode: map['sparepart_code'],
     );
   }
 }

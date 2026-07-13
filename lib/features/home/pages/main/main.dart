@@ -6,6 +6,7 @@ import 'package:kasirsuper/features/pos/pages/index/page.dart';
 import 'package:kasirsuper/features/product/product.dart';
 import 'package:kasirsuper/features/settings/pages/pages.dart';
 import 'package:kasirsuper/features/transaction/pages/index/page.dart';
+import 'package:kasirsuper/features/product/pages/sparepart_menu/page.dart';
 
 class MainPage extends StatelessWidget {
   const MainPage({super.key});
@@ -18,7 +19,7 @@ class MainPage extends StatelessWidget {
       HomePage(),
       TransactionPage(),
       POSPage(),
-      ProductPage(),
+      SparepartMenuPage(),
       SettingPage(),
     ];
 

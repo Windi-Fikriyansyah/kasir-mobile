@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:kasirsuper/core/core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 part 'sections/image_section.dart';
 
@@ -17,10 +20,48 @@ class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
+  String? _imagePath;
 
   @override
   void initState() {
     super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      nameController.text = prefs.getString('profile_name') ?? '';
+      emailController.text = prefs.getString('profile_email') ?? '';
+      phoneController.text = prefs.getString('profile_phone') ?? '';
+      _imagePath = prefs.getString('profile_image');
+    });
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _imagePath = pickedFile.path;
+      });
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('profile_name', nameController.text);
+    await prefs.setString('profile_email', emailController.text);
+    await prefs.setString('profile_phone', phoneController.text);
+    if (_imagePath != null) {
+      await prefs.setString('profile_image', _imagePath!);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informasi usaha berhasil disimpan')),
+      );
+      Navigator.pop(context, true);
+    }
   }
 
   @override
@@ -38,7 +79,10 @@ class _ProfilePageState extends State<ProfilePage> {
       body: ListView(
         padding: const EdgeInsets.all(Dimens.dp16),
         children: [
-          const _ImageSection(),
+          _ImageSection(
+            imagePath: _imagePath,
+            onTap: _pickImage,
+          ),
           const Divider(),
           RegularTextInput(
             controller: nameController,
@@ -66,7 +110,12 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Padding(
           padding: const EdgeInsets.all(Dimens.dp16),
           child: ElevatedButton(
-            onPressed: () {},
+            onPressed: _saveProfile,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+              backgroundColor: context.theme.colorScheme.primary,
+              foregroundColor: context.theme.colorScheme.onPrimary,
+            ),
             child: const Text('Simpan'),
           ),
         ),

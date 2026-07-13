@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:kasirsuper/core/core.dart';
 import 'package:kasirsuper/features/settings/settings.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/core/widgets/notification_bell.dart';
 import 'package:kasirsuper/features/report/pages/index/page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 part 'sections/profile_section.dart';
 
@@ -37,13 +39,9 @@ class SettingPage extends StatelessWidget {
                         ItemMenuSetting(
                           title: 'Informasi Usaha',
                           icon: AppIcons.receipt,
-                          onTap: () {},
-                        ),
-                        const Divider(height: 0),
-                        ItemMenuSetting(
-                          title: 'API  Key Xendit',
-                          icon: AppIcons.creditCard,
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.pushNamed(context, ProfilePage.routeName);
+                          },
                         ),
                       ],
                     ),
@@ -60,7 +58,12 @@ class SettingPage extends StatelessWidget {
                         ItemMenuSetting(
                           title: 'Printer',
                           icon: Icons.print,
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const PrinterPage()),
+                            );
+                          },
                         ),
                         const Divider(height: 0),
                         ItemMenuSetting(

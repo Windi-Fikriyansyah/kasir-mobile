@@ -2,6 +2,7 @@ import 'package:kasirsuper/features/product/models/product_model.dart';
 import 'package:kasirsuper/features/service/models/service_model.dart';
 import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
 import 'package:kasirsuper/features/transaction/models/transaction_item_model.dart';
+import 'package:kasirsuper/features/mechanic/models/mechanic_model.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -25,7 +26,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -42,7 +43,8 @@ class DatabaseHelper {
         cost INTEGER,
         stock INTEGER,
         minStock INTEGER,
-        imagePath TEXT
+        imagePath TEXT,
+        sparepart_code TEXT
       )
     ''');
     
@@ -91,14 +93,24 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE mechanics(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        phone TEXT,
+        address TEXT,
+        skills TEXT
+      )
+    ''');
+
     // Insert some initial data
     await db.execute('''
-      INSERT INTO products (name, sku, category, price, cost, stock, minStock)
+      INSERT INTO products (name, sku, category, price, cost, stock, minStock, sparepart_code)
       VALUES 
-        ('Acoustic Pro X1', 'SKU: AUD-9920-B', 'Elektronik', 189000, 150000, 2, 5),
-        ('Essential Cotton Tee', 'SKU: APP-1102-W', 'Pakaian', 25000, 15000, 142, 10),
-        ('Artisan Ceramic Mug', 'SKU: HOM-0043-T', 'Peralatan Rumah', 18500, 10000, 58, 20),
-        ('Rapid-Sync 1TB Drive', 'SKU: ACC-8831-S', 'Aksesoris', 115000, 90000, 5, 10)
+        ('Acoustic Pro X1', 'SKU: AUD-9920-B', 'Elektronik', 189000, 150000, 2, 5, 'SPR-000001'),
+        ('Essential Cotton Tee', 'SKU: APP-1102-W', 'Pakaian', 25000, 15000, 142, 10, 'SPR-000002'),
+        ('Artisan Ceramic Mug', 'SKU: HOM-0043-T', 'Peralatan Rumah', 18500, 10000, 58, 20, 'SPR-000003'),
+        ('Rapid-Sync 1TB Drive', 'SKU: ACC-8831-S', 'Aksesoris', 115000, 90000, 5, 10, 'SPR-000004')
     ''');
   }
 
@@ -153,6 +165,36 @@ class DatabaseHelper {
         )
       ''');
     }
+
+    if (oldVersion < 5) {
+      await db.execute('''
+        CREATE TABLE mechanics(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT,
+          phone TEXT,
+          address TEXT,
+          skills TEXT
+        )
+      ''');
+    }
+
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE stock_movements(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER,
+          type TEXT,
+          quantity INTEGER,
+          date TEXT,
+          notes TEXT,
+          FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+        )
+      ''');
+    }
+
+    if (oldVersion < 7) {
+      await db.execute('ALTER TABLE products ADD COLUMN sparepart_code TEXT');
+    }
   }
 
   // CRUD for Products
@@ -188,6 +230,56 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // Stock Movements
+  Future<int> insertStockMovement(int productId, String type, int quantity, String notes) async {
+    final db = await database;
+    int movementId = 0;
+
+    await db.transaction((txn) async {
+      // 1. Insert into stock_movements
+      movementId = await txn.insert('stock_movements', {
+        'product_id': productId,
+        'type': type,
+        'quantity': quantity,
+        'date': DateTime.now().toIso8601String(),
+        'notes': notes,
+      });
+
+      // 2. Update product stock
+      if (type == 'in') {
+        await txn.rawUpdate(
+          'UPDATE products SET stock = stock + ? WHERE id = ?',
+          [quantity, productId],
+        );
+      } else if (type == 'out') {
+        await txn.rawUpdate(
+          'UPDATE products SET stock = stock - ? WHERE id = ?',
+          [quantity, productId],
+        );
+      } else if (type == 'opname') {
+        await txn.rawUpdate(
+          'UPDATE products SET stock = ? WHERE id = ?',
+          [quantity, productId],
+        );
+      }
+    });
+
+    return movementId;
+  }
+
+  Future<List<Map<String, dynamic>>> getStockMovements() async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT 
+        sm.*, 
+        p.name as product_name, 
+        p.sku as product_sku
+      FROM stock_movements sm
+      LEFT JOIN products p ON sm.product_id = p.id
+      ORDER BY sm.date DESC
+    ''');
   }
 
   // Transactions
@@ -294,6 +386,41 @@ class DatabaseHelper {
     return await db.update(
       'notifications',
       {'is_read': 1},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // CRUD for Mechanics
+  Future<int> insertMechanic(MechanicModel mechanic) async {
+    final db = await database;
+    return await db.insert(
+      'mechanics',
+      mechanic.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<MechanicModel>> getMechanics() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('mechanics', orderBy: 'id DESC');
+    return List.generate(maps.length, (i) => MechanicModel.fromMap(maps[i]));
+  }
+
+  Future<int> updateMechanic(MechanicModel mechanic) async {
+    final db = await database;
+    return await db.update(
+      'mechanics',
+      mechanic.toMap(),
+      where: 'id = ?',
+      whereArgs: [mechanic.id],
+    );
+  }
+
+  Future<int> deleteMechanic(int id) async {
+    final db = await database;
+    return await db.delete(
+      'mechanics',
       where: 'id = ?',
       whereArgs: [id],
     );

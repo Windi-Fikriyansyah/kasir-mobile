@@ -18,6 +18,7 @@ class AddProductPage extends StatefulWidget {
 class _AddProductPageState extends State<AddProductPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _skuController = TextEditingController();
+  final TextEditingController _sparepartCodeController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _costController = TextEditingController();
   final TextEditingController _stockController = TextEditingController();
@@ -35,6 +36,7 @@ class _AddProductPageState extends State<AddProductPage> {
     if (widget.product != null) {
       _nameController.text = widget.product!.name;
       _skuController.text = widget.product!.sku;
+      _sparepartCodeController.text = widget.product!.sparepartCode ?? '';
       _priceController.text = widget.product!.price.toString();
       _costController.text = widget.product!.cost.toString();
       _stockController.text = widget.product!.stock.toString();
@@ -53,6 +55,10 @@ class _AddProductPageState extends State<AddProductPage> {
           _imageFile = File(widget.product!.imagePath!);
         }
       }
+    } else {
+      // Auto generate Kode Sparepart for new product
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      _sparepartCodeController.text = 'SPR-${timestamp.substring(timestamp.length - 6)}';
     }
   }
 
@@ -60,6 +66,7 @@ class _AddProductPageState extends State<AddProductPage> {
   void dispose() {
     _nameController.dispose();
     _skuController.dispose();
+    _sparepartCodeController.dispose();
     _priceController.dispose();
     _costController.dispose();
     _stockController.dispose();
@@ -76,6 +83,7 @@ class _AddProductPageState extends State<AddProductPage> {
       id: widget.product?.id,
       name: _nameController.text,
       sku: _skuController.text,
+      sparepartCode: _sparepartCodeController.text,
       category: _selectedCategory ?? 'Lainnya',
       price: int.tryParse(_priceController.text) ?? 0,
       cost: int.tryParse(_costController.text) ?? 0,
@@ -277,27 +285,47 @@ class _AddProductPageState extends State<AddProductPage> {
                     _buildTextFieldLabel('SKU / Barcode'),
                     _buildTextField(
                       controller: _skuController,
-                      hintText: '001-923',
-                      suffixWidget: IconButton(
-                        icon: const Icon(Icons.qr_code_scanner, color: QuickPOSColors.onSurfaceVariant),
-                        onPressed: () async {
-                          final sku = await Navigator.push<String>(
+                      hintText: 'Scan atau Ketik',
+                      fontFamily: 'JetBrains Mono',
+                      suffixWidget: InkWell(
+                        onTap: () async {
+                          final result = await Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const ScannerPage(returnSkuOnly: true)),
+                            MaterialPageRoute(builder: (context) => const ScannerPage()),
                           );
-                          if (sku != null && sku.isNotEmpty) {
+                          if (result != null && result is String) {
                             setState(() {
-                              _skuController.text = sku;
+                              _skuController.text = result;
                             });
                           }
                         },
+                        child: const Icon(Icons.qr_code_scanner, color: QuickPOSColors.primary),
                       ),
-                      fontFamily: 'JetBrains Mono',
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTextFieldLabel('Kode Sparepart'),
+                    _buildTextField(
+                      controller: _sparepartCodeController,
+                      hintText: 'SPR-XXXXXX',
+                      readOnly: true,
+                      fontFamily: 'JetBrains Mono',
+                      prefixColor: QuickPOSColors.outline,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,6 +569,7 @@ class _AddProductPageState extends State<AddProductPage> {
     FontWeight? fontWeight,
     String? fontFamily,
     TextAlign textAlign = TextAlign.start,
+    bool readOnly = false,
   }) {
     return SizedBox(
       height: 48,
@@ -548,6 +577,7 @@ class _AddProductPageState extends State<AddProductPage> {
         controller: controller,
         keyboardType: keyboardType,
         textAlign: textAlign,
+        readOnly: readOnly,
         style: TextStyle(
           fontSize: 16,
           fontWeight: fontWeight,
@@ -581,7 +611,7 @@ class _AddProductPageState extends State<AddProductPage> {
                   ? Icon(suffixIcon, color: suffixIconColor ?? QuickPOSColors.onSurfaceVariant)
                   : null),
           filled: true,
-          fillColor: QuickPOSColors.surfaceContainerLowest,
+          fillColor: readOnly ? QuickPOSColors.surfaceContainerHigh : QuickPOSColors.surfaceContainerLowest,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),

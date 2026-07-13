@@ -12,6 +12,8 @@ import 'package:kasirsuper/features/home/home.dart';
 import 'package:kasirsuper/features/service/pages/index/page.dart';
 import 'package:kasirsuper/features/notification/blocs/notification_bloc.dart';
 import 'package:kasirsuper/features/notification/pages/index/page.dart';
+import 'package:kasirsuper/features/mechanic/mechanic.dart';
+import 'package:kasirsuper/features/product/pages/sparepart_menu/page.dart';
 import 'package:kasirsuper/core/widgets/notification_bell.dart';
 
 typedef DashboardColors = QuickPOSColors;
@@ -324,7 +326,10 @@ class _MenuGridSection extends StatelessWidget {
                 context.read<BottomNavBloc>().add(const TapBottomNavEvent(2));
               }),
               _buildMenuItem(context, Icons.build_circle_outlined, 'Sparepart', DashboardColors.secondary, () {
-                context.read<BottomNavBloc>().add(const TapBottomNavEvent(3));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SparepartMenuPage()),
+                );
               }),
               _buildMenuItem(context, Icons.handyman, 'Service', Colors.teal, () {
                 Navigator.push(
@@ -336,6 +341,12 @@ class _MenuGridSection extends StatelessWidget {
                 context.read<BottomNavBloc>().add(const TapBottomNavEvent(1));
               }),
               _buildMenuItem(context, Icons.people, 'Pelanggan', Colors.blue, () {}),
+              _buildMenuItem(context, Icons.engineering, 'Mekanik', Colors.brown, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MechanicListPage()),
+                );
+              }),
               _buildMenuItem(context, Icons.bar_chart, 'Laporan', Colors.purple, () {}),
               _buildMenuItem(context, Icons.settings, 'Pengaturan', Colors.grey, () {
                 context.read<BottomNavBloc>().add(const TapBottomNavEvent(4));
