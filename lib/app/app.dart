@@ -8,6 +8,7 @@ import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/pos/blocs/pos_bloc.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/service/blocs/blocs.dart';
+import 'package:kasirsuper/features/notification/blocs/notification_bloc.dart';
 import 'package:kasirsuper/core/database/database_helper.dart';
 
 class MyApp extends StatelessWidget {
@@ -24,6 +25,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => ServiceBloc(dbHelper: DatabaseHelper())..add(LoadServices())),
         BlocProvider(create: (context) => PosBloc()),
         BlocProvider(create: (context) => TransactionBloc(databaseHelper: DatabaseHelper())),
+        BlocProvider(create: (context) => NotificationBloc(databaseHelper: DatabaseHelper())..add(LoadNotifications())),
       ],
       child: MaterialApp(
         title: 'Kasir Super',

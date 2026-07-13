@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
+import 'package:kasirsuper/core/widgets/notification_bell.dart';
 
 class TransactionPage extends StatefulWidget {
   const TransactionPage({super.key});
@@ -655,11 +656,7 @@ class _TransactionAppBar extends StatelessWidget {
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: QuickPOSColors.onSurfaceVariant),
-            onPressed: () {},
-            splashRadius: 24,
-          ),
+          const NotificationBell(),
         ],
       ),
     );

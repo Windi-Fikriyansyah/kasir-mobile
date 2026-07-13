@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/product/models/product_model.dart';
+import 'package:kasirsuper/core/widgets/notification_bell.dart';
 import 'package:kasirsuper/features/product/pages/add_product/page.dart';
 import 'package:intl/intl.dart';
 class ProductPage extends StatefulWidget {
@@ -651,11 +652,7 @@ class _ProductAppBar extends StatelessWidget {
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: QuickPOSColors.onSurfaceVariant),
-            onPressed: () {},
-            splashRadius: 24,
-          ),
+          const NotificationBell(),
         ],
       ),
     );

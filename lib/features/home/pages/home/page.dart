@@ -10,6 +10,9 @@ import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/service/blocs/blocs.dart';
 import 'package:kasirsuper/features/home/home.dart';
 import 'package:kasirsuper/features/service/pages/index/page.dart';
+import 'package:kasirsuper/features/notification/blocs/notification_bloc.dart';
+import 'package:kasirsuper/features/notification/pages/index/page.dart';
+import 'package:kasirsuper/core/widgets/notification_bell.dart';
 
 typedef DashboardColors = QuickPOSColors;
 
@@ -106,11 +109,7 @@ class _HomeAppBar extends StatelessWidget {
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: DashboardColors.onSurfaceVariant),
-            onPressed: () {},
-            splashRadius: 24,
-          ),
+          const NotificationBell(),
         ],
       ),
     );

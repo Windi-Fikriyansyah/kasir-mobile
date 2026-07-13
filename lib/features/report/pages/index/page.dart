@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
+import 'package:kasirsuper/core/widgets/notification_bell.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/product/models/product_model.dart';
@@ -40,10 +42,7 @@ class _ReportPageState extends State<ReportPage> {
             icon: const Icon(Icons.share, color: QuickPOSColors.onSurfaceVariant),
             onPressed: () {},
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: QuickPOSColors.primary),
-            onPressed: () {},
-          ),
+          const NotificationBell(iconColor: QuickPOSColors.primary),
         ],
       ),
       body: SafeArea(

@@ -8,6 +8,9 @@ import 'package:kasirsuper/features/pos/models/cart_item_model.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
 import 'package:kasirsuper/features/transaction/models/transaction_item_model.dart';
+import 'package:kasirsuper/features/notification/blocs/notification_bloc.dart';
+import 'package:kasirsuper/features/notification/models/notification_model.dart';
+import 'package:kasirsuper/core/services/notification_service.dart';
 
 class CurrencyInputFormatter extends TextInputFormatter {
   @override
@@ -92,6 +95,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
 
     context.read<TransactionBloc>().add(SaveTransaction(transaction));
+    
+    // Check for low stock warnings
+    for (var cartItem in posState.items) {
+      if (cartItem.itemType == 'product' && cartItem.product != null) {
+        final remainingStock = cartItem.product!.stock - cartItem.quantity;
+        if (remainingStock <= cartItem.product!.minStock) {
+          final title = 'Peringatan Stok: ${cartItem.name}';
+          final body = 'Sisa stok tinggal $remainingStock. Segera restock!';
+          
+          // Show Push Notification
+          NotificationService().showNotification(title: title, body: body);
+          
+          // Save In-App Notification
+          context.read<NotificationBloc>().add(AddNotification(
+            NotificationModel(
+              title: title,
+              body: body,
+              date: DateTime.now().toIso8601String(),
+            ),
+          ));
+        }
+      }
+    }
+    
     context.read<PosBloc>().add(ClearCart());
     
     ScaffoldMessenger.of(context).showSnackBar(

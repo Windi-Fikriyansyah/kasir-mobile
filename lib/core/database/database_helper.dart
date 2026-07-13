@@ -25,7 +25,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -81,6 +81,16 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE notifications(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        body TEXT,
+        date TEXT,
+        is_read INTEGER DEFAULT 0
+      )
+    ''');
+
     // Insert some initial data
     await db.execute('''
       INSERT INTO products (name, sku, category, price, cost, stock, minStock)
@@ -130,6 +140,18 @@ class DatabaseHelper {
         )
       ''');
       await db.execute('ALTER TABLE transaction_items ADD COLUMN item_type TEXT DEFAULT "product"');
+    }
+
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE notifications(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT,
+          body TEXT,
+          date TEXT,
+          is_read INTEGER DEFAULT 0
+        )
+      ''');
     }
   }
 
@@ -247,6 +269,31 @@ class DatabaseHelper {
     final db = await database;
     return await db.delete(
       'services',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // CRUD for Notifications
+  Future<int> insertNotification(Map<String, dynamic> notificationData) async {
+    final db = await database;
+    return await db.insert(
+      'notifications',
+      notificationData,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getNotifications() async {
+    final db = await database;
+    return await db.query('notifications', orderBy: 'id DESC');
+  }
+
+  Future<int> markNotificationAsRead(int id) async {
+    final db = await database;
+    return await db.update(
+      'notifications',
+      {'is_read': 1},
       where: 'id = ?',
       whereArgs: [id],
     );

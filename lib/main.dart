@@ -4,7 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kasirsuper/app/app.dart';
 import 'package:kasirsuper/core/core.dart';
 
-void main() {
+import 'package:kasirsuper/core/services/notification_service.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -12,6 +14,9 @@ void main() {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
+  // Inisialisasi notifikasi lokal
+  await NotificationService().init();
+  
   // Observer digunakan untuk melihat perubahan ketika ada perubahan di bloc
   Bloc.observer = AppBlocObserver();  
   runApp(const MyApp());

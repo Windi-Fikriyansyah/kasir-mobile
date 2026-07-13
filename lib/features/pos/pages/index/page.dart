@@ -9,6 +9,7 @@ import 'package:kasirsuper/features/pos/pages/scanner/page.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/product/models/product_model.dart';
 import 'package:kasirsuper/features/service/blocs/blocs.dart';
+import 'package:kasirsuper/core/widgets/notification_bell.dart';
 import 'package:kasirsuper/features/service/models/service_model.dart';
 import 'package:kasirsuper/features/pos/models/cart_item_model.dart';
 
@@ -165,11 +166,7 @@ class _POSAppBar extends StatelessWidget {
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: QuickPOSColors.onSurfaceVariant),
-            onPressed: () {},
-            splashRadius: 24,
-          ),
+          const NotificationBell(),
         ],
       ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kasirsuper/core/core.dart';
 import 'package:kasirsuper/features/settings/settings.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
+import 'package:kasirsuper/core/widgets/notification_bell.dart';
 import 'package:kasirsuper/features/report/pages/index/page.dart';
 
 part 'sections/profile_section.dart';
@@ -162,11 +163,7 @@ class _SettingAppBar extends StatelessWidget {
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: QuickPOSColors.onSurfaceVariant),
-            onPressed: () {},
-            splashRadius: 24,
-          ),
+          const NotificationBell(),
         ],
       ),
     );
