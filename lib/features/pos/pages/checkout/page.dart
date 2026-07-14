@@ -11,6 +11,10 @@ import 'package:kasirsuper/features/transaction/models/transaction_item_model.da
 import 'package:kasirsuper/features/notification/blocs/notification_bloc.dart';
 import 'package:kasirsuper/features/notification/models/notification_model.dart';
 import 'package:kasirsuper/core/services/notification_service.dart';
+import 'package:kasirsuper/features/mechanic/blocs/mechanic/mechanic_bloc.dart';
+import 'package:kasirsuper/features/mechanic/blocs/mechanic/mechanic_state.dart';
+import 'package:kasirsuper/features/mechanic/blocs/mechanic/mechanic_event.dart';
+import 'package:kasirsuper/features/mechanic/models/mechanic_model.dart';
 
 class CurrencyInputFormatter extends TextInputFormatter {
   @override
@@ -43,6 +47,15 @@ class CheckoutPage extends StatefulWidget {
 class _CheckoutPageState extends State<CheckoutPage> {
   String? selectedPaymentMethod;
   final TextEditingController _amountController = TextEditingController();
+  
+  double discountPercent = 0.0;
+  bool applyTax = false;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<MechanicBloc>().add(LoadMechanics());
+  }
 
   @override
   void dispose() {
@@ -58,7 +71,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   void _handlePayment(BuildContext context) {
     final posState = context.read<PosBloc>().state;
-    final total = posState.totalAmount;
+    
+    final subTotal = posState.totalAmount;
+    final discountAmount = subTotal * (discountPercent / 100);
+    final afterDiscount = subTotal - discountAmount;
+    final taxAmount = applyTax ? afterDiscount * 0.11 : 0.0;
+    final total = afterDiscount + taxAmount;
+    
     double amountGiven = total;
 
     if (selectedPaymentMethod == 'cash') {
@@ -77,13 +96,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
     
     final change = amountGiven - total;
     
-    final items = posState.items.map((cartItem) => TransactionItemModel(
-      productId: cartItem.id, // Using generic id
-      productName: cartItem.name, // Using generic name
-      price: cartItem.price, // Using generic price
-      quantity: cartItem.quantity,
-      itemType: cartItem.itemType, // Using generic itemType
-    )).toList();
+    final items = posState.items.map((cartItem) {
+      double commAmount = 0.0;
+      if (cartItem.itemType == 'service' && cartItem.service != null && cartItem.assignedMechanic != null) {
+        commAmount = (cartItem.service!.price * cartItem.quantity) * (cartItem.service!.commissionPercent / 100);
+      }
+      return TransactionItemModel(
+        productId: cartItem.id, // Using generic id
+        productName: cartItem.name, // Using generic name
+        price: cartItem.price, // Using generic price
+        quantity: cartItem.quantity,
+        itemType: cartItem.itemType, // Using generic itemType
+        mechanicId: cartItem.assignedMechanic?.id,
+        mechanicName: cartItem.assignedMechanic?.name,
+        commissionAmount: commAmount,
+      );
+    }).toList();
     
     final transaction = TransactionModel(
       date: DateTime.now().toIso8601String(),
@@ -91,6 +119,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
       amountGiven: amountGiven,
       change: change > 0 ? change : 0,
       paymentMethod: selectedPaymentMethod!,
+      discountPercent: discountPercent > 0 ? discountPercent : null,
+      taxPercent: applyTax ? 11.0 : null,
       items: items,
     );
 
@@ -134,6 +164,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
   Widget build(BuildContext context) {
     return BlocBuilder<PosBloc, PosState>(
       builder: (context, posState) {
+        final subTotal = posState.totalAmount;
+        final discountAmount = subTotal * (discountPercent / 100);
+        final afterDiscount = subTotal - discountAmount;
+        final taxAmount = applyTax ? afterDiscount * 0.11 : 0.0;
+        final finalTotal = afterDiscount + taxAmount;
+
         return Scaffold(
           backgroundColor: Colors.white,
           body: SafeArea(
@@ -150,8 +186,23 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         children: [
                           _OrderSummarySection(
                             cartCount: posState.totalQuantity,
-                            cartTotal: posState.totalAmount,
+                            cartTotal: finalTotal,
+                            subTotal: subTotal,
+                            discountAmount: discountAmount,
+                            taxAmount: taxAmount,
                             items: posState.items,
+                            discountPercent: discountPercent,
+                            applyTax: applyTax,
+                            onDiscountChanged: (val) {
+                              setState(() {
+                                discountPercent = double.tryParse(val) ?? 0.0;
+                              });
+                            },
+                            onTaxChanged: (val) {
+                              setState(() {
+                                applyTax = val;
+                              });
+                            },
                           ),
                           const SizedBox(height: 24),
                           _PaymentCategoriesSection(
@@ -165,7 +216,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ),
                 _BottomActionBar(
                   selectedMethod: selectedPaymentMethod,
-                  cartTotal: posState.totalAmount,
+                  cartTotal: finalTotal,
                   amountController: _amountController,
                   onPayPressed: () => _handlePayment(context),
                 ),
@@ -230,11 +281,25 @@ class _OrderSummarySection extends StatelessWidget {
   final int cartCount;
   final double cartTotal;
   final List<CartItemModel> items;
+  final double subTotal;
+  final double discountAmount;
+  final double taxAmount;
+  final double discountPercent;
+  final bool applyTax;
+  final ValueChanged<String> onDiscountChanged;
+  final ValueChanged<bool> onTaxChanged;
 
   const _OrderSummarySection({
     required this.cartCount,
     required this.cartTotal,
     required this.items,
+    required this.subTotal,
+    required this.discountAmount,
+    required this.taxAmount,
+    required this.discountPercent,
+    required this.applyTax,
+    required this.onDiscountChanged,
+    required this.onTaxChanged,
   });
 
   @override
@@ -305,6 +370,78 @@ class _OrderSummarySection extends StatelessWidget {
                   fontSize: 14,
                   color: QuickPOSColors.onSurfaceVariant,
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Divider(color: QuickPOSColors.outlineVariant),
+          const SizedBox(height: 16),
+          // Subtotal
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Subtotal', style: TextStyle(color: QuickPOSColors.onSurfaceVariant)),
+              Text(formatCurrency.format(subTotal), style: const TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Discount Info
+          if (discountAmount > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Diskon ($discountPercent%)', style: const TextStyle(color: QuickPOSColors.error)),
+                Text('- ${formatCurrency.format(discountAmount)}', style: const TextStyle(color: QuickPOSColors.error, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          if (discountAmount > 0) const SizedBox(height: 8),
+          // Tax Info
+          if (applyTax)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('PPN (11%)', style: TextStyle(color: QuickPOSColors.primary)),
+                Text('+ ${formatCurrency.format(taxAmount)}', style: const TextStyle(color: QuickPOSColors.primary, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          if (applyTax) const SizedBox(height: 8),
+          
+          const SizedBox(height: 16),
+          // Discount Input
+          Row(
+            children: [
+              const Icon(Icons.discount_outlined, color: QuickPOSColors.outline, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: 'Diskon (%)',
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: QuickPOSColors.outlineVariant),
+                    ),
+                  ),
+                  onChanged: onDiscountChanged,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Tax Toggle
+          Row(
+            children: [
+              const Icon(Icons.receipt_long, color: QuickPOSColors.outline, size: 20),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Gunakan PPN 11%', style: TextStyle(color: QuickPOSColors.onSurface)),
+              ),
+              Switch(
+                value: applyTax,
+                onChanged: onTaxChanged,
+                activeColor: QuickPOSColors.primary,
               ),
             ],
           ),
@@ -391,6 +528,40 @@ class _OrderSummarySection extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (item.itemType == 'service') ...[
+                  const SizedBox(height: 8),
+                  BlocBuilder<MechanicBloc, MechanicState>(
+                    builder: (context, mechanicState) {
+                      if (mechanicState is MechanicLoaded && mechanicState.mechanics.isNotEmpty) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: QuickPOSColors.outlineVariant),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<MechanicModel>(
+                              value: item.assignedMechanic,
+                              hint: const Text('Pilih Mekanik (Opsional)', style: TextStyle(fontSize: 12)),
+                              isExpanded: true,
+                              icon: const Icon(Icons.arrow_drop_down, size: 20),
+                              items: mechanicState.mechanics.map((mechanic) {
+                                return DropdownMenuItem<MechanicModel>(
+                                  value: mechanic,
+                                  child: Text(mechanic.name, style: const TextStyle(fontSize: 12)),
+                                );
+                              }).toList(),
+                              onChanged: (MechanicModel? newValue) {
+                                context.read<PosBloc>().add(UpdateCartItemMechanic(item, newValue));
+                              },
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox();
+                    },
+                  ),
+                ],
               ],
             ),
           ),

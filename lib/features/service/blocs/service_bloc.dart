@@ -24,6 +24,7 @@ class ServiceBloc extends Bloc<ServiceEvent, ServiceState> {
           name: event.name,
           sku: event.sku,
           price: event.price,
+          commissionPercent: event.commissionPercent,
           description: event.description,
         );
         await dbHelper.insertService(service);
@@ -40,6 +41,7 @@ class ServiceBloc extends Bloc<ServiceEvent, ServiceState> {
           name: event.name,
           sku: event.sku,
           price: event.price,
+          commissionPercent: event.commissionPercent,
           description: event.description,
         );
         await dbHelper.updateService(service);

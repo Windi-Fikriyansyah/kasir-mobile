@@ -6,6 +6,9 @@ class TransactionItemModel {
   final double price;
   final int quantity;
   final String itemType;
+  final int? mechanicId;
+  final String? mechanicName;
+  final double commissionAmount;
 
   TransactionItemModel({
     this.id,
@@ -15,6 +18,9 @@ class TransactionItemModel {
     required this.price,
     required this.quantity,
     this.itemType = 'product',
+    this.mechanicId,
+    this.mechanicName,
+    this.commissionAmount = 0.0,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +32,9 @@ class TransactionItemModel {
       'price': price,
       'quantity': quantity,
       'item_type': itemType,
+      'mechanic_id': mechanicId,
+      'mechanic_name': mechanicName,
+      'commission_amount': commissionAmount,
     };
   }
 
@@ -38,6 +47,9 @@ class TransactionItemModel {
       price: (map['price'] as num).toDouble(),
       quantity: map['quantity'],
       itemType: map['item_type'] ?? 'product',
+      mechanicId: map['mechanic_id'],
+      mechanicName: map['mechanic_name'],
+      commissionAmount: (map['commission_amount'] ?? 0.0).toDouble(),
     );
   }
 }

@@ -7,6 +7,9 @@ import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/product/models/product_model.dart';
 import 'package:intl/intl.dart';
+import 'package:kasirsuper/features/report/services/export_service.dart';
+import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
+import 'package:open_filex/open_filex.dart';
 import 'dart:io';
 
 class ReportPage extends StatefulWidget {
@@ -17,6 +20,8 @@ class ReportPage extends StatefulWidget {
 }
 
 class _ReportPageState extends State<ReportPage> {
+  String _selectedPeriod = 'Semua Data';
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,11 +68,27 @@ class _ReportPageState extends State<ReportPage> {
   }
 
   Widget _buildContent(BuildContext context, TransactionLoaded txState, ProductLoaded prodState) {
+    final now = DateTime.now();
+    var filteredTransactions = txState.transactions.where((txn) {
+      final dt = DateTime.parse(txn.date);
+      if (_selectedPeriod == 'Hari Ini') {
+        return dt.year == now.year && dt.month == now.month && dt.day == now.day;
+      } else if (_selectedPeriod == 'Kemarin') {
+        final yesterday = now.subtract(const Duration(days: 1));
+        return dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day;
+      } else if (_selectedPeriod == '7 Hari Terakhir') {
+        return now.difference(dt).inDays <= 7;
+      } else if (_selectedPeriod == 'Bulan Ini') {
+        return dt.year == now.year && dt.month == now.month;
+      }
+      return true; // Semua Data
+    }).toList();
+
     // Kalkulasi Pendapatan, Laba, Margin
     double totalPendapatan = 0;
     double labaBersih = 0;
 
-    for (var tx in txState.transactions) {
+    for (var tx in filteredTransactions) {
       totalPendapatan += tx.totalAmount;
       if (tx.items != null) {
         for (var item in tx.items!) {
@@ -87,7 +108,7 @@ class _ReportPageState extends State<ReportPage> {
     Map<String, double> categoryRevenue = {};
     Map<String, int> categoryTransactions = {}; 
     
-    for (var tx in txState.transactions) {
+    for (var tx in filteredTransactions) {
       if (tx.items != null) {
         for (var item in tx.items!) {
           final product = prodState.products.firstWhere(
@@ -107,7 +128,7 @@ class _ReportPageState extends State<ReportPage> {
     // Top Products
     Map<int, double> productRevenue = {};
     Map<int, int> productUnits = {};
-    for (var tx in txState.transactions) {
+    for (var tx in filteredTransactions) {
       if (tx.items != null) {
         for (var item in tx.items!) {
           productRevenue[item.productId] = (productRevenue[item.productId] ?? 0) + (item.price * item.quantity);
@@ -136,7 +157,7 @@ class _ReportPageState extends State<ReportPage> {
           if (sortedCategories.isNotEmpty) const SizedBox(height: 16),
           if (sortedProducts.isNotEmpty) _buildTopProducts(sortedProducts, productUnits, prodState.products, totalPendapatan),
           if (sortedProducts.isNotEmpty) const SizedBox(height: 24),
-          _buildExportActions(),
+          _buildExportActions(filteredTransactions, prodState.products),
           const SizedBox(height: 24),
         ],
       ),
@@ -144,42 +165,92 @@ class _ReportPageState extends State<ReportPage> {
   }
 
   Widget _buildDateFilter() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: QuickPOSColors.surfaceContainerLowest,
-        border: Border.all(color: QuickPOSColors.outlineVariant),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
-        ]
+    return InkWell(
+      onTap: () => _showFilterDialog(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: QuickPOSColors.surfaceContainerLowest,
+          border: Border.all(color: QuickPOSColors.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
+          ]
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.calendar_today, color: QuickPOSColors.secondary),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('PERIODE', style: TextStyle(fontSize: 12, color: QuickPOSColors.onSurfaceVariant, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    Text(_selectedPeriod, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  ],
+                )
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: QuickPOSColors.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.tune, color: Colors.white, size: 20),
+            )
+          ],
+        ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
+    );
+  }
+
+  void _showFilterDialog(BuildContext context) {
+    final periods = ['Hari Ini', 'Kemarin', '7 Hari Terakhir', 'Bulan Ini', 'Semua Data'];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.calendar_today, color: QuickPOSColors.secondary),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('PERIODE', style: TextStyle(fontSize: 12, color: QuickPOSColors.onSurfaceVariant, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  const Text('Semua Data', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                ],
-              )
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Text('Pilih Periode', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 16),
+              ...periods.map((period) => ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                title: Text(
+                  period,
+                  style: TextStyle(
+                    fontWeight: _selectedPeriod == period ? FontWeight.bold : FontWeight.normal,
+                    color: _selectedPeriod == period ? QuickPOSColors.primary : QuickPOSColors.onSurface,
+                  ),
+                ),
+                trailing: _selectedPeriod == period 
+                    ? const Icon(Icons.check, color: QuickPOSColors.primary)
+                    : null,
+                onTap: () {
+                  setState(() {
+                    _selectedPeriod = period;
+                  });
+                  Navigator.pop(context);
+                },
+              )),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: QuickPOSColors.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.tune, color: Colors.white, size: 20),
-          )
-        ],
-      ),
+        );
+      }
     );
   }
 
@@ -452,7 +523,7 @@ class _ReportPageState extends State<ReportPage> {
     );
   }
 
-  Widget _buildExportActions() {
+  Widget _buildExportActions(List<TransactionModel> transactions, List<ProductModel> products) {
     return Row(
       children: [
         Expanded(
@@ -464,9 +535,33 @@ class _ReportPageState extends State<ReportPage> {
               backgroundColor: QuickPOSColors.surfaceContainerLowest,
               foregroundColor: QuickPOSColors.onSurface,
             ),
-            icon: const Icon(Icons.description),
-            label: const Text('Export CSV', style: TextStyle(fontWeight: FontWeight.bold)),
-            onPressed: () {},
+            icon: const Icon(Icons.table_chart),
+            label: const Text('Unduh Excel', style: TextStyle(fontWeight: FontWeight.bold)),
+            onPressed: () async {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Menyimpan Excel...'), duration: Duration(seconds: 1)),
+              );
+              final path = await ExportService.generateExcel(
+                transactions: transactions,
+                products: products,
+                period: _selectedPeriod,
+              );
+              if (context.mounted && path != null) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('File Excel berhasil diunduh'),
+                    duration: const Duration(seconds: 5),
+                    action: SnackBarAction(
+                      label: 'Buka',
+                      onPressed: () {
+                        OpenFilex.open(path);
+                      },
+                    ),
+                  ),
+                );
+              }
+            },
           ),
         ),
         const SizedBox(width: 16),
@@ -481,7 +576,31 @@ class _ReportPageState extends State<ReportPage> {
             ),
             icon: const Icon(Icons.picture_as_pdf),
             label: const Text('Unduh PDF', style: TextStyle(fontWeight: FontWeight.bold)),
-            onPressed: () {},
+            onPressed: () async {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Menyimpan PDF...'), duration: Duration(seconds: 1)),
+              );
+              final path = await ExportService.generatePdf(
+                transactions: transactions,
+                products: products,
+                period: _selectedPeriod,
+              );
+              if (context.mounted && path != null) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('File PDF berhasil diunduh'),
+                    duration: const Duration(seconds: 5),
+                    action: SnackBarAction(
+                      label: 'Buka',
+                      onPressed: () {
+                        OpenFilex.open(path);
+                      },
+                    ),
+                  ),
+                );
+              }
+            },
           ),
         ),
       ],

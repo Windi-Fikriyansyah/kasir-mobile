@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kasirsuper/core/widgets/notification_bell.dart';
 
 class TransactionPage extends StatefulWidget {
@@ -390,8 +391,18 @@ class _TransactionPageState extends State<TransactionPage> {
     );
   }
 
-  void _showReceiptModal(String txnId, TransactionModel txn) {
+  Future<void> _showReceiptModal(String txnId, TransactionModel txn) async {
+    final prefs = await SharedPreferences.getInstance();
+    final storeName = prefs.getString('receipt_store_name') ?? 'Kasir SUPER';
+    final storeAddress = prefs.getString('receipt_store_address') ?? 'Alamat Toko';
+    final storePhone = prefs.getString('receipt_store_phone') ?? '08123456789';
+    final footer = prefs.getString('receipt_footer') ?? 'Terima kasih telah berbelanja!';
+    final showMechanic = prefs.getBool('receipt_show_mechanic') ?? true;
+
     final formatCurrency = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
+    
+    if (!mounted) return;
+    
     showDialog(
       context: context,
       builder: (ctx) {
@@ -421,19 +432,27 @@ class _TransactionPageState extends State<TransactionPage> {
                   ),
                   child: Column(
                     children: [
-                      const Text(
-                        'QuickPOS Retail',
-                        style: TextStyle(
+                      Text(
+                        storeName,
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: QuickPOSColors.primary,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Store #4421 • Downtown Hub',
-                        style: TextStyle(
+                      Text(
+                        storeAddress,
+                        style: const TextStyle(
                           fontSize: 14,
+                          color: QuickPOSColors.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Telp: $storePhone',
+                        style: const TextStyle(
+                          fontSize: 12,
                           color: QuickPOSColors.onSurfaceVariant,
                         ),
                       ),
@@ -463,35 +482,72 @@ class _TransactionPageState extends State<TransactionPage> {
                     child: Column(
                       children: [
                         if (txn.items != null)
-                          ...txn.items!.map((item) => Column(
-                            children: [
-                              _buildReceiptItem('${item.productName} (${item.quantity}x)', formatCurrency.format(item.price * item.quantity)),
-                              const SizedBox(height: 8),
-                            ],
-                          )),
+                          ...txn.items!.map((item) {
+                            String subtitleText = item.itemType == 'service' ? 'Jasa' : 'Sparepart';
+                            if (showMechanic && item.itemType == 'service' && item.mechanicName != null) {
+                              subtitleText += ' • Mekanik: ${item.mechanicName}';
+                            }
+                            return Column(
+                              children: [
+                                _buildReceiptItem(
+                                  '${item.productName} (${item.quantity}x)',
+                                  formatCurrency.format(item.price * item.quantity),
+                                  subtitle: subtitleText,
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                            );
+                          }),
                         const SizedBox(height: 16),
                         const Divider(color: QuickPOSColors.outlineVariant),
                         const SizedBox(height: 16),
-                        _buildReceiptRow('Subtotal', formatCurrency.format(txn.totalAmount)),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Total',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              formatCurrency.format(txn.totalAmount),
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        Builder(
+                          builder: (context) {
+                            final subtotal = (txn.items ?? []).fold<double>(
+                              0.0,
+                              (sum, item) => sum + (item.price * item.quantity),
+                            );
+                            
+                            final hasDiscount = txn.discountPercent != null && txn.discountPercent! > 0;
+                            final discountAmount = hasDiscount ? subtotal * (txn.discountPercent! / 100) : 0.0;
+                            
+                            final hasTax = txn.taxPercent != null && txn.taxPercent! > 0;
+                            final taxAmount = hasTax ? (subtotal - discountAmount) * (txn.taxPercent! / 100) : 0.0;
+                            
+                            return Column(
+                              children: [
+                                _buildReceiptRow('Subtotal', formatCurrency.format(subtotal)),
+                                if (hasDiscount) ...[
+                                  const SizedBox(height: 8),
+                                  _buildReceiptRow('Diskon (${txn.discountPercent}%)', '- ${formatCurrency.format(discountAmount)}'),
+                                ],
+                                if (hasTax) ...[
+                                  const SizedBox(height: 8),
+                                  _buildReceiptRow('PPN (${txn.taxPercent}%)', '+ ${formatCurrency.format(taxAmount)}'),
+                                ],
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Total',
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      formatCurrency.format(txn.totalAmount),
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
                         ),
                         const SizedBox(height: 24),
                         Text(
@@ -521,6 +577,16 @@ class _TransactionPageState extends State<TransactionPage> {
                                 color: Colors.black87,
                               );
                             }),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          footer,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: QuickPOSColors.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -581,18 +647,31 @@ class _TransactionPageState extends State<TransactionPage> {
     );
   }
 
-  Widget _buildReceiptItem(String name, String price) {
+  Widget _buildReceiptItem(String name, String price, {String? subtitle}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(
-            name,
-            style: const TextStyle(
-              fontSize: 14,
-              color: QuickPOSColors.onSurfaceVariant,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: QuickPOSColors.onSurfaceVariant,
+                ),
+              ),
+              if (subtitle != null)
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: QuickPOSColors.outline,
+                  ),
+                ),
+            ],
           ),
         ),
         Text(

@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:kasirsuper/features/mechanic/models/mechanic_model.dart';
 import 'package:kasirsuper/features/pos/models/cart_item_model.dart';
 import 'package:kasirsuper/features/product/models/product_model.dart';
 
@@ -31,6 +32,14 @@ class DeleteItemFromCart extends PosEvent {
   List<Object?> get props => [item];
 }
 
+class UpdateCartItemMechanic extends PosEvent {
+  final CartItemModel item;
+  final MechanicModel? mechanic;
+  const UpdateCartItemMechanic(this.item, this.mechanic);
+  @override
+  List<Object?> get props => [item, mechanic];
+}
+
 class ClearCart extends PosEvent {}
 
 // --- State ---
@@ -56,6 +65,7 @@ class PosBloc extends Bloc<PosEvent, PosState> {
     on<AddItemToCart>(_onAddItem);
     on<RemoveItemFromCart>(_onRemoveItem);
     on<DeleteItemFromCart>(_onDeleteItem);
+    on<UpdateCartItemMechanic>(_onUpdateMechanic);
     on<ClearCart>(_onClearCart);
   }
 
@@ -104,6 +114,16 @@ class PosBloc extends Bloc<PosEvent, PosState> {
     final updatedItems = List<CartItemModel>.from(state.items);
     updatedItems.removeWhere((i) => i.id == event.item.id && i.itemType == event.item.itemType);
     emit(state.copyWith(items: updatedItems));
+  }
+
+  void _onUpdateMechanic(UpdateCartItemMechanic event, Emitter<PosState> emit) {
+    final updatedItems = List<CartItemModel>.from(state.items);
+    final existingIndex = updatedItems.indexWhere((i) => i.id == event.item.id && i.itemType == event.item.itemType);
+    if (existingIndex >= 0) {
+      final existingItem = updatedItems[existingIndex];
+      updatedItems[existingIndex] = existingItem.copyWith(assignedMechanic: event.mechanic);
+      emit(state.copyWith(items: updatedItems));
+    }
   }
 
   void _onClearCart(ClearCart event, Emitter<PosState> emit) {

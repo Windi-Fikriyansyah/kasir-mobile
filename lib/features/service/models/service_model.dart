@@ -5,6 +5,7 @@ class ServiceModel {
   final String category;
   final double price;
   final String? description;
+  final double commissionPercent;
 
   ServiceModel({
     this.id,
@@ -13,6 +14,7 @@ class ServiceModel {
     this.category = 'Service',
     required this.price,
     this.description,
+    this.commissionPercent = 0.0,
   });
 
   Map<String, dynamic> toMap() {
@@ -23,6 +25,7 @@ class ServiceModel {
       'category': category,
       'price': price,
       'description': description,
+      'commission_percent': commissionPercent,
     };
   }
 
@@ -34,6 +37,7 @@ class ServiceModel {
       category: map['category'] ?? 'Service',
       price: (map['price'] ?? 0).toDouble(),
       description: map['description'],
+      commissionPercent: (map['commission_percent'] ?? 0).toDouble(),
     );
   }
 
@@ -44,6 +48,7 @@ class ServiceModel {
     String? category,
     double? price,
     String? description,
+    double? commissionPercent,
   }) {
     return ServiceModel(
       id: id ?? this.id,
@@ -52,6 +57,7 @@ class ServiceModel {
       category: category ?? this.category,
       price: price ?? this.price,
       description: description ?? this.description,
+      commissionPercent: commissionPercent ?? this.commissionPercent,
     );
   }
 }

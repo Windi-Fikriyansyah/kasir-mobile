@@ -5,6 +5,7 @@ import 'package:kasirsuper/features/settings/settings.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/core/widgets/notification_bell.dart';
 import 'package:kasirsuper/features/report/pages/index/page.dart';
+import 'package:kasirsuper/features/settings/pages/receipt_settings/page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 part 'sections/profile_section.dart';
@@ -69,7 +70,12 @@ class SettingPage extends StatelessWidget {
                         ItemMenuSetting(
                           title: 'Atur Struk',
                           icon: AppIcons.coupon,
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const ReceiptSettingsPage()),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -98,26 +104,7 @@ class SettingPage extends StatelessWidget {
                     const Divider(
                       thickness: Dimens.dp8,
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(Dimens.dp16),
-                          child: RegularText.semiBold('Info Lainnya'),
-                        ),
-                        ItemMenuSetting(
-                          title: 'Kebijakan Privasi',
-                          icon: AppIcons.verified,
-                          onTap: () {},
-                        ),
-                        const Divider(height: 0),
-                        ItemMenuSetting(
-                          title: 'Beri Rating',
-                          icon: AppIcons.star,
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
+
                     Padding(
                       padding: const EdgeInsets.all(Dimens.dp16),
                       child: OutlinedButton(

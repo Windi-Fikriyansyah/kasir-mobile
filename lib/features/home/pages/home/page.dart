@@ -13,7 +13,9 @@ import 'package:kasirsuper/features/service/pages/index/page.dart';
 import 'package:kasirsuper/features/notification/blocs/notification_bloc.dart';
 import 'package:kasirsuper/features/notification/pages/index/page.dart';
 import 'package:kasirsuper/features/mechanic/mechanic.dart';
+import 'package:kasirsuper/features/mechanic/pages/commission/page.dart';
 import 'package:kasirsuper/features/product/pages/sparepart_menu/page.dart';
+import 'package:kasirsuper/features/report/pages/index/page.dart';
 import 'package:kasirsuper/core/widgets/notification_bell.dart';
 
 typedef DashboardColors = QuickPOSColors;
@@ -340,14 +342,24 @@ class _MenuGridSection extends StatelessWidget {
               _buildMenuItem(context, Icons.history, 'Riwayat', Colors.orange, () {
                 context.read<BottomNavBloc>().add(const TapBottomNavEvent(1));
               }),
-              _buildMenuItem(context, Icons.people, 'Pelanggan', Colors.blue, () {}),
               _buildMenuItem(context, Icons.engineering, 'Mekanik', Colors.brown, () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const MechanicListPage()),
                 );
               }),
-              _buildMenuItem(context, Icons.bar_chart, 'Laporan', Colors.purple, () {}),
+              _buildMenuItem(context, Icons.request_quote, 'Komisi', Colors.deepOrange, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MechanicCommissionPage()),
+                );
+              }),
+              _buildMenuItem(context, Icons.bar_chart, 'Laporan', Colors.purple, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ReportPage()),
+                );
+              }),
               _buildMenuItem(context, Icons.settings, 'Pengaturan', Colors.grey, () {
                 context.read<BottomNavBloc>().add(const TapBottomNavEvent(4));
               }),

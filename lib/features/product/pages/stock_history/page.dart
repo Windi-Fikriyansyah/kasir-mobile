@@ -1,9 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
-import 'package:kasirsuper/features/product/models/stock_movement_model.dart';
-import 'package:intl/intl.dart';
+import 'package:kasirsuper/features/product/models/product_model.dart';
+import 'package:kasirsuper/features/product/pages/stock_history/product_history_page.dart';
 
 class StockHistoryPage extends StatefulWidget {
   const StockHistoryPage({super.key});
@@ -13,58 +14,12 @@ class StockHistoryPage extends StatefulWidget {
 }
 
 class _StockHistoryPageState extends State<StockHistoryPage> {
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
-    context.read<StockBloc>().add(LoadStockHistoryEvent());
-  }
-
-  String _formatDate(String isoDate) {
-    try {
-      final date = DateTime.parse(isoDate);
-      return DateFormat('dd MMM yyyy, HH:mm').format(date);
-    } catch (e) {
-      return isoDate;
-    }
-  }
-
-  IconData _getIconForType(String type) {
-    switch (type) {
-      case 'in':
-        return Icons.arrow_downward;
-      case 'out':
-        return Icons.arrow_upward;
-      case 'opname':
-        return Icons.sync_alt;
-      default:
-        return Icons.history;
-    }
-  }
-
-  Color _getColorForType(String type) {
-    switch (type) {
-      case 'in':
-        return Colors.green;
-      case 'out':
-        return Colors.red;
-      case 'opname':
-        return Colors.orange;
-      default:
-        return QuickPOSColors.outline;
-    }
-  }
-
-  String _getLabelForType(String type) {
-    switch (type) {
-      case 'in':
-        return 'Stok Masuk';
-      case 'out':
-        return 'Stok Keluar (Terjual)';
-      case 'opname':
-        return 'Stok Opname';
-      default:
-        return 'Lainnya';
-    }
+    context.read<ProductBloc>().add(LoadProducts());
   }
 
   @override
@@ -72,146 +27,126 @@ class _StockHistoryPageState extends State<StockHistoryPage> {
     return Scaffold(
       backgroundColor: QuickPOSColors.surface,
       appBar: AppBar(
-        title: const Text('Riwayat Stok'),
+        title: const Text('Pilih Produk'),
         backgroundColor: Colors.white,
         foregroundColor: QuickPOSColors.onSurface,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<StockBloc>().add(LoadStockHistoryEvent());
-            },
-          ),
-        ],
-      ),
-      body: BlocBuilder<StockBloc, StockState>(
-        builder: (context, state) {
-          if (state is StockLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is StockError) {
-            return Center(child: Text(state.message, style: const TextStyle(color: QuickPOSColors.error)));
-          } else if (state is StockHistoryLoaded) {
-            final movements = state.movements;
-
-            if (movements.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.history_toggle_off, size: 64, color: QuickPOSColors.outlineVariant),
-                    SizedBox(height: 16),
-                    Text(
-                      'Belum ada riwayat pergerakan stok',
-                      style: TextStyle(fontSize: 16, color: QuickPOSColors.onSurfaceVariant),
-                    ),
-                  ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Cari Nama, SKU, atau Kode...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: QuickPOSColors.surfaceContainerHigh,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
+            ),
+          ),
+        ),
+      ),
+      body: BlocBuilder<ProductBloc, ProductState>(
+        builder: (context, state) {
+          if (state is ProductLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is ProductLoaded) {
+            final filteredProducts = state.products.where((p) {
+              return p.name.toLowerCase().contains(_searchQuery) ||
+                     p.sku.toLowerCase().contains(_searchQuery) ||
+                     (p.sparepartCode?.toLowerCase().contains(_searchQuery) ?? false);
+            }).toList();
+
+            if (filteredProducts.isEmpty) {
+              return Center(
+                child: Text('Tidak ada produk ditemukan.', style: TextStyle(color: QuickPOSColors.outline)),
               );
             }
 
             return ListView.separated(
               padding: const EdgeInsets.all(16),
-              itemCount: movements.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemCount: filteredProducts.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
-                final movement = movements[index];
-                final color = _getColorForType(movement.type);
-
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: QuickPOSColors.surfaceContainerLowest,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: QuickPOSColors.surfaceContainerHigh),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                final product = filteredProducts[index];
+                return InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProductStockHistoryPage(product: product),
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          shape: BoxShape.circle,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: QuickPOSColors.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: QuickPOSColors.surfaceContainerHigh),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: QuickPOSColors.surfaceContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          clipBehavior: Clip.hardEdge,
+                          child: product.imagePath != null
+                              ? (product.imagePath!.startsWith('http')
+                                  ? Image.network(
+                                      product.imagePath!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2, color: QuickPOSColors.outlineVariant),
+                                    )
+                                  : Image.file(
+                                      File(product.imagePath!),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2, color: QuickPOSColors.outlineVariant),
+                                    ))
+                              : const Icon(Icons.inventory_2, color: QuickPOSColors.outlineVariant),
                         ),
-                        child: Icon(
-                          _getIconForType(movement.type),
-                          color: color,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              movement.productName ?? 'Produk Tidak Diketahui',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: QuickPOSColors.onSurface,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "${movement.productSku ?? '-'} • ${_getLabelForType(movement.type)}",
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: QuickPOSColors.onSurfaceVariant,
-                              ),
-                            ),
-                            if (movement.notes.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
-                                '"${movement.notes}"',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontStyle: FontStyle.italic,
-                                  color: QuickPOSColors.outline,
-                                ),
+                                '${product.sparepartCode ?? product.sku} (Stok: ${product.stock})',
+                                style: const TextStyle(color: QuickPOSColors.outline, fontSize: 13),
                               ),
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            movement.type == 'opname' 
-                                ? '=${movement.quantity}' 
-                                : "${movement.type == 'in' ? '+' : '-'}${movement.quantity}",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              color: color,
-                              fontFamily: 'JetBrains Mono',
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _formatDate(movement.date),
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: QuickPOSColors.outline,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        const Icon(Icons.chevron_right, color: QuickPOSColors.outlineVariant),
+                      ],
+                    ),
                   ),
                 );
               },
             );
+          } else if (state is ProductError) {
+            return Center(child: Text(state.message, style: const TextStyle(color: QuickPOSColors.error)));
           }
-
           return const SizedBox();
         },
       ),

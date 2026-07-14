@@ -17,6 +17,7 @@ class _AddServicePageState extends State<AddServicePage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
+  final _commissionController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   bool get isEdit => widget.service != null;
@@ -27,6 +28,7 @@ class _AddServicePageState extends State<AddServicePage> {
     if (isEdit) {
       _nameController.text = widget.service!.name;
       _priceController.text = widget.service!.price.toInt().toString();
+      _commissionController.text = widget.service!.commissionPercent.toString();
       _descriptionController.text = widget.service!.description ?? '';
     }
   }
@@ -35,6 +37,7 @@ class _AddServicePageState extends State<AddServicePage> {
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _commissionController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -43,6 +46,7 @@ class _AddServicePageState extends State<AddServicePage> {
     if (_formKey.currentState!.validate()) {
       final name = _nameController.text;
       final price = double.parse(_priceController.text);
+      final commissionPercent = double.tryParse(_commissionController.text) ?? 0.0;
       final description = _descriptionController.text;
 
       if (isEdit) {
@@ -50,12 +54,14 @@ class _AddServicePageState extends State<AddServicePage> {
           id: widget.service!.id!,
           name: name,
           price: price,
+          commissionPercent: commissionPercent,
           description: description,
         ));
       } else {
         context.read<ServiceBloc>().add(AddService(
           name: name,
           price: price,
+          commissionPercent: commissionPercent,
           description: description,
         ));
       }
@@ -134,6 +140,13 @@ class _AddServicePageState extends State<AddServicePage> {
                   if (double.tryParse(value) == null) return 'Harga tidak valid';
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _commissionController,
+                label: 'Komisi Mekanik (%)',
+                icon: Icons.percent,
+                keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
               _buildTextField(

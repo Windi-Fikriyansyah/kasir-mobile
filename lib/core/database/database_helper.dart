@@ -26,7 +26,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 9,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -55,7 +55,9 @@ class DatabaseHelper {
         total_amount REAL,
         amount_given REAL,
         change REAL,
-        payment_method TEXT
+        payment_method TEXT,
+        discount_percent REAL,
+        tax_percent REAL
       )
     ''');
 
@@ -68,6 +70,9 @@ class DatabaseHelper {
         price REAL,
         quantity INTEGER,
         item_type TEXT DEFAULT 'product',
+        mechanic_id INTEGER,
+        mechanic_name TEXT,
+        commission_amount REAL DEFAULT 0.0,
         FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE CASCADE
       )
     ''');
@@ -79,7 +84,8 @@ class DatabaseHelper {
         sku TEXT,
         category TEXT,
         price REAL,
-        description TEXT
+        description TEXT,
+        commission_percent REAL DEFAULT 0.0
       )
     ''');
 
@@ -115,85 +121,102 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute('''
-        CREATE TABLE transactions(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          date TEXT,
-          total_amount REAL,
-          amount_given REAL,
-          change REAL,
-          payment_method TEXT
-        )
-      ''');
+    try {
+      if (oldVersion < 2) {
+        await db.execute('''
+          CREATE TABLE transactions(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            total_amount REAL,
+            amount_given REAL,
+            change REAL,
+            payment_method TEXT
+          )
+        ''');
 
-      await db.execute('''
-        CREATE TABLE transaction_items(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          transaction_id INTEGER,
-          product_id INTEGER,
-          product_name TEXT,
-          price REAL,
-          quantity INTEGER,
-          FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE CASCADE
-        )
-      ''');
-    }
+        await db.execute('''
+          CREATE TABLE transaction_items(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            transaction_id INTEGER,
+            product_id INTEGER,
+            product_name TEXT,
+            price REAL,
+            quantity INTEGER,
+            FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE CASCADE
+          )
+        ''');
+      }
 
-    if (oldVersion < 3) {
-      await db.execute('''
-        CREATE TABLE services(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT,
-          sku TEXT,
-          category TEXT,
-          price REAL,
-          description TEXT
-        )
-      ''');
-      await db.execute('ALTER TABLE transaction_items ADD COLUMN item_type TEXT DEFAULT "product"');
-    }
+      if (oldVersion < 3) {
+        await db.execute('''
+          CREATE TABLE services(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            sku TEXT,
+            category TEXT,
+            price REAL,
+            description TEXT,
+            commission_percent REAL DEFAULT 0.0
+          )
+        ''');
+        await db.execute('ALTER TABLE transaction_items ADD COLUMN item_type TEXT DEFAULT "product"');
+      }
 
-    if (oldVersion < 4) {
-      await db.execute('''
-        CREATE TABLE notifications(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          title TEXT,
-          body TEXT,
-          date TEXT,
-          is_read INTEGER DEFAULT 0
-        )
-      ''');
-    }
+      if (oldVersion < 4) {
+        await db.execute('''
+          CREATE TABLE notifications(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            body TEXT,
+            date TEXT,
+            is_read INTEGER DEFAULT 0
+          )
+        ''');
+      }
 
-    if (oldVersion < 5) {
-      await db.execute('''
-        CREATE TABLE mechanics(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT,
-          phone TEXT,
-          address TEXT,
-          skills TEXT
-        )
-      ''');
-    }
+      if (oldVersion < 5) {
+        await db.execute('''
+          CREATE TABLE mechanics(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            phone TEXT,
+            address TEXT,
+            skills TEXT
+          )
+        ''');
+      }
 
-    if (oldVersion < 6) {
-      await db.execute('''
-        CREATE TABLE stock_movements(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          product_id INTEGER,
-          type TEXT,
-          quantity INTEGER,
-          date TEXT,
-          notes TEXT,
-          FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
-        )
-      ''');
-    }
+      if (oldVersion < 6) {
+        await db.execute('''
+          CREATE TABLE stock_movements(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER,
+            type TEXT,
+            quantity INTEGER,
+            date TEXT,
+            notes TEXT,
+            FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+          )
+        ''');
+      }
 
-    if (oldVersion < 7) {
-      await db.execute('ALTER TABLE products ADD COLUMN sparepart_code TEXT');
+      if (oldVersion < 7) {
+        await db.execute('ALTER TABLE products ADD COLUMN sparepart_code TEXT');
+      }
+
+      if (oldVersion < 8) {
+        await db.execute('ALTER TABLE transactions ADD COLUMN discount_percent REAL');
+        await db.execute('ALTER TABLE transactions ADD COLUMN tax_percent REAL');
+      }
+
+      if (oldVersion < 9) {
+        await db.execute('ALTER TABLE services ADD COLUMN commission_percent REAL DEFAULT 0.0');
+        await db.execute('ALTER TABLE transaction_items ADD COLUMN mechanic_id INTEGER');
+        await db.execute('ALTER TABLE transaction_items ADD COLUMN mechanic_name TEXT');
+        await db.execute('ALTER TABLE transaction_items ADD COLUMN commission_amount REAL DEFAULT 0.0');
+      }
+    } catch (e) {
+      // Handle upgrade errors
     }
   }
 
@@ -302,6 +325,15 @@ class DatabaseHelper {
               'UPDATE products SET stock = stock - ? WHERE id = ?',
               [item.quantity, item.productId],
             );
+
+            // Record as stock out movement
+            await txn.insert('stock_movements', {
+              'product_id': item.productId,
+              'type': 'out',
+              'quantity': item.quantity,
+              'date': transaction.date,
+              'notes': 'Penjualan Kasir (POS)',
+            });
           }
         }
       }

@@ -6,12 +6,14 @@ class AddService extends ServiceEvent {
   final String name;
   final String? sku;
   final double price;
+  final double commissionPercent;
   final String? description;
 
   AddService({
     required this.name,
     this.sku,
     required this.price,
+    this.commissionPercent = 0.0,
     this.description,
   });
 }
@@ -21,6 +23,7 @@ class UpdateService extends ServiceEvent {
   final String name;
   final String? sku;
   final double price;
+  final double commissionPercent;
   final String? description;
 
   UpdateService({
@@ -28,6 +31,7 @@ class UpdateService extends ServiceEvent {
     required this.name,
     this.sku,
     required this.price,
+    this.commissionPercent = 0.0,
     this.description,
   });
 }

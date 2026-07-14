@@ -7,6 +7,8 @@ class TransactionModel {
   final double amountGiven;
   final double change;
   final String paymentMethod;
+  final double? discountPercent;
+  final double? taxPercent;
   final List<TransactionItemModel>? items;
 
   TransactionModel({
@@ -16,6 +18,8 @@ class TransactionModel {
     required this.amountGiven,
     required this.change,
     required this.paymentMethod,
+    this.discountPercent,
+    this.taxPercent,
     this.items,
   });
 
@@ -27,6 +31,8 @@ class TransactionModel {
       'amount_given': amountGiven,
       'change': change,
       'payment_method': paymentMethod,
+      'discount_percent': discountPercent,
+      'tax_percent': taxPercent,
     };
   }
 
@@ -38,6 +44,8 @@ class TransactionModel {
       amountGiven: (map['amount_given'] as num).toDouble(),
       change: (map['change'] as num).toDouble(),
       paymentMethod: map['payment_method'],
+      discountPercent: map['discount_percent'] != null ? (map['discount_percent'] as num).toDouble() : null,
+      taxPercent: map['tax_percent'] != null ? (map['tax_percent'] as num).toDouble() : null,
       items: items,
     );
   }
