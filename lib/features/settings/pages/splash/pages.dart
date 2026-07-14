@@ -37,7 +37,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Dimens.defaultSize
                 .height, // Ini juga menggunakan extension yaitu sizedbox extension
             HeadingText(
-              'Kasir Super',
+              'BengkelPro',
               style: TextStyle(
                 color: context.theme.primaryColor,
                 fontSize: Dimens.dp32,

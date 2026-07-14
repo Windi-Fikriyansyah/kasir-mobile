@@ -87,7 +87,7 @@ class _ProfilePageState extends State<ProfilePage> {
           RegularTextInput(
             controller: nameController,
             label: 'Nama Bisnis',
-            hintText: 'Kasir SUPER',
+            hintText: 'BengkelPro',
           ),
           Dimens.dp24.height,
           RegularTextInput(

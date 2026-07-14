@@ -9,8 +9,8 @@ class _ProfileSection extends StatefulWidget {
 
 class _ProfileSectionState extends State<_ProfileSection> {
   String? _imagePath;
-  String _name = 'Kasir SUPER';
-  String _email = 'superpos@gmail.com';
+  String _name = 'BengkelPro';
+  String _email = 'BengkelPro@gmail.com';
   String _phone = '+6282117499922';
 
   @override
@@ -22,8 +22,8 @@ class _ProfileSectionState extends State<_ProfileSection> {
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _name = prefs.getString('profile_name') ?? 'Kasir SUPER';
-      _email = prefs.getString('profile_email') ?? 'superpos@gmail.com';
+      _name = prefs.getString('profile_name') ?? 'BengkelPro';
+      _email = prefs.getString('profile_email') ?? 'BengkelPro@gmail.com';
       _phone = prefs.getString('profile_phone') ?? '+6282117499922';
       _imagePath = prefs.getString('profile_image');
     });

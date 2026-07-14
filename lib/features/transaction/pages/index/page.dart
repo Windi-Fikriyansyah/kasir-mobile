@@ -393,7 +393,7 @@ class _TransactionPageState extends State<TransactionPage> {
 
   Future<void> _showReceiptModal(String txnId, TransactionModel txn) async {
     final prefs = await SharedPreferences.getInstance();
-    final storeName = prefs.getString('receipt_store_name') ?? 'Kasir SUPER';
+    final storeName = prefs.getString('receipt_store_name') ?? 'BengkelPro';
     final storeAddress = prefs.getString('receipt_store_address') ?? 'Alamat Toko';
     final storePhone = prefs.getString('receipt_store_phone') ?? '08123456789';
     final footer = prefs.getString('receipt_footer') ?? 'Terima kasih telah berbelanja!';
@@ -726,7 +726,7 @@ class _TransactionAppBar extends StatelessWidget {
               Icon(Icons.storefront, color: QuickPOSColors.primary),
               SizedBox(width: 8),
               Text(
-                'QuickPOS',
+                'BengkelPro',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,

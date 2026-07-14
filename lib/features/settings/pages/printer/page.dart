@@ -131,7 +131,7 @@ class _PrinterPageState extends State<PrinterPage> {
       bool isConnected = await PrintBluetoothThermal.connectionStatus;
       if (isConnected) {
         await PrintBluetoothThermal.writeString(
-          printText: PrintTextSize(size: 2, text: "KASIR SUPER\n"),
+          printText: PrintTextSize(size: 2, text: "BengkelPro\n"),
         );
         await PrintBluetoothThermal.writeString(
           printText: PrintTextSize(size: 1, text: "Test Print Berhasil\n"),

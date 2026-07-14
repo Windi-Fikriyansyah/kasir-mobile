@@ -84,6 +84,10 @@ class _ProductPageState extends State<ProductPage> {
         backgroundColor: Colors.white,
         foregroundColor: QuickPOSColors.onSurface,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -639,3 +643,4 @@ class _ProductPageState extends State<ProductPage> {
     );
   }
 }
+

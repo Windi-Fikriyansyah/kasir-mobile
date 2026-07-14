@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Kasir Super',
+        title: 'BengkelPro',
         debugShowCheckedModeBanner: false,
         theme: LightTheme(AppColors.green).theme,
         home: const SplashScreen(),

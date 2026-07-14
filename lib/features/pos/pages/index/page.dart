@@ -157,7 +157,7 @@ class _POSAppBar extends StatelessWidget {
               Icon(Icons.storefront, color: QuickPOSColors.primary),
               SizedBox(width: 8),
               Text(
-                'QuickPOS',
+                'BengkelPro',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,

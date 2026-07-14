@@ -104,7 +104,7 @@ class _HomeAppBar extends StatelessWidget {
               Icon(Icons.storefront, color: DashboardColors.primary),
               SizedBox(width: 8),
               Text(
-                'QuickPOS',
+                'BengkelPro',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,

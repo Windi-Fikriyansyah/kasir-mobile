@@ -6,6 +6,7 @@ import 'package:kasirsuper/features/product/pages/index/page.dart';
 import 'package:kasirsuper/features/product/pages/stock_in/page.dart';
 import 'package:kasirsuper/features/product/pages/stock_opname/page.dart';
 import 'package:kasirsuper/features/product/pages/stock_history/page.dart';
+import 'package:kasirsuper/core/widgets/notification_bell.dart';
 
 class SparepartMenuPage extends StatelessWidget {
   const SparepartMenuPage({super.key});
@@ -13,15 +14,16 @@ class SparepartMenuPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: QuickPOSColors.surface,
-      appBar: AppBar(
-        title: const Text('Menu Sparepart'),
-        backgroundColor: Colors.white,
-        foregroundColor: QuickPOSColors.onSurface,
-        elevation: 0,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            const _SparepartMenuAppBar(),
+            Expanded(
+              child: Container(
+                color: QuickPOSColors.surface,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
         child: GridView.count(
           crossAxisCount: 2,
           mainAxisSpacing: 16,
@@ -77,6 +79,11 @@ class SparepartMenuPage extends StatelessWidget {
               },
             ),
           ],
+        ),
+      ),
+    ),
+  ),
+],
         ),
       ),
     );
@@ -163,6 +170,38 @@ class PlaceholderPage extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SparepartMenuAppBar extends StatelessWidget {
+  const _SparepartMenuAppBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 8),
+      color: Colors.white,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.storefront, color: QuickPOSColors.primary),
+              SizedBox(width: 8),
+              Text(
+                'BengkelPro',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: QuickPOSColors.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const NotificationBell(),
+        ],
       ),
     );
   }
