@@ -67,6 +67,13 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   json_serializable: ^6.8.0
   build_runner: ^2.4.10
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_size: 21
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

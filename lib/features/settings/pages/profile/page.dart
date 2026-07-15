@@ -93,7 +93,7 @@ class _ProfilePageState extends State<ProfilePage> {
           RegularTextInput(
             controller: emailController,
             label: 'Email',
-            hintText: 'kasirsuper@gmail.com',
+            hintText: 'bengkelpro@gmail.com',
             keyboardType: TextInputType.emailAddress,
           ),
           Dimens.dp24.height,

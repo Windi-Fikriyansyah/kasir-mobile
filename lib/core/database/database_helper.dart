@@ -109,15 +109,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Insert some initial data
-    await db.execute('''
-      INSERT INTO products (name, sku, category, price, cost, stock, minStock, sparepart_code)
-      VALUES 
-        ('Acoustic Pro X1', 'SKU: AUD-9920-B', 'Elektronik', 189000, 150000, 2, 5, 'SPR-000001'),
-        ('Essential Cotton Tee', 'SKU: APP-1102-W', 'Pakaian', 25000, 15000, 142, 10, 'SPR-000002'),
-        ('Artisan Ceramic Mug', 'SKU: HOM-0043-T', 'Peralatan Rumah', 18500, 10000, 58, 20, 'SPR-000003'),
-        ('Rapid-Sync 1TB Drive', 'SKU: ACC-8831-S', 'Aksesoris', 115000, 90000, 5, 10, 'SPR-000004')
-    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
