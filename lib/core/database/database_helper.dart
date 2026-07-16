@@ -26,7 +26,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 10,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -106,6 +106,18 @@ class DatabaseHelper {
         phone TEXT,
         address TEXT,
         skills TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE stock_movements(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER,
+        type TEXT,
+        quantity INTEGER,
+        date TEXT,
+        notes TEXT,
+        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
       )
     ''');
 
@@ -205,6 +217,20 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE transaction_items ADD COLUMN mechanic_id INTEGER');
         await db.execute('ALTER TABLE transaction_items ADD COLUMN mechanic_name TEXT');
         await db.execute('ALTER TABLE transaction_items ADD COLUMN commission_amount REAL DEFAULT 0.0');
+      }
+
+      if (oldVersion < 10) {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS stock_movements(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER,
+            type TEXT,
+            quantity INTEGER,
+            date TEXT,
+            notes TEXT,
+            FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+          )
+        ''');
       }
     } catch (e) {
       // Handle upgrade errors

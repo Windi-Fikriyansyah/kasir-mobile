@@ -257,26 +257,7 @@ class _SalesSummarySection extends StatelessWidget {
                   ],
                 ),
               ),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: const [
-                    Icon(Icons.trending_up, color: DashboardColors.secondary, size: 16),
-                    SizedBox(width: 2),
-                    Flexible(
-                      child: Text(
-                        '+12% vs yest.',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: DashboardColors.secondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+
             ],
           ),
         ],

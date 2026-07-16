@@ -30,6 +30,25 @@ class _AddProductPageState extends State<AddProductPage> {
   String? _existingImageUrl;
   final ImagePicker _picker = ImagePicker();
 
+  final List<String> _validCategories = [
+    '🔧 Oli & Cairan',
+    '🛢️ Filter',
+    '⚙️ Mesin',
+    '🚗 Sistem Rem',
+    '🚘 Suspensi & Kaki-kaki',
+    '🔩 Kopling & Transmisi',
+    '⚡ Kelistrikan',
+    '💡 Lampu',
+    '❄️ AC & Pendingin',
+    '🚿 Wiper & Washer',
+    '🛞 Ban & Velg',
+    '⛓️ Rantai & Gear (Motor)',
+    '🏍️ CVT (Motor Matic)',
+    '🪛 Body & Interior',
+    '🔑 Fast Moving',
+    '📦 Aksesoris',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -43,8 +62,10 @@ class _AddProductPageState extends State<AddProductPage> {
       _minStockController.text = widget.product!.minStock.toString();
       
       // Ensure the selected category matches one of the items.
-      final validCategories = ['Makanan', 'Minuman', 'Elektronik', 'Fashion', 'Aksesoris', 'Peralatan Rumah', 'Pakaian', 'Lainnya'];
-      if (validCategories.contains(widget.product!.category)) {
+      if (_validCategories.contains(widget.product!.category)) {
+        _selectedCategory = widget.product!.category;
+      } else if (widget.product!.category.isNotEmpty) {
+        _validCategories.add(widget.product!.category);
         _selectedCategory = widget.product!.category;
       }
 
@@ -75,6 +96,28 @@ class _AddProductPageState extends State<AddProductPage> {
   }
 
   void _saveProduct() async {
+    if (_nameController.text.trim().isEmpty ||
+        _skuController.text.trim().isEmpty ||
+        _selectedCategory == null ||
+        _priceController.text.trim().isEmpty ||
+        _costController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(child: Text('Nama produk, SKU, Kategori, dan Pengaturan Harga wajib diisi')),
+            ],
+          ),
+          backgroundColor: QuickPOSColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -345,7 +388,7 @@ class _AddProductPageState extends State<AddProductPage> {
                           hint: const Text('Pilih Kategori', style: TextStyle(color: QuickPOSColors.outline)),
                           isExpanded: true,
                           icon: const Icon(Icons.expand_more, color: QuickPOSColors.onSurfaceVariant),
-                          items: ['Makanan', 'Minuman', 'Elektronik', 'Fashion', 'Aksesoris', 'Peralatan Rumah', 'Pakaian', 'Lainnya'].map((String value) {
+                          items: _validCategories.map((String value) {
                             return DropdownMenuItem<String>(
                               value: value,
                               child: Text(value),

@@ -563,7 +563,7 @@ class _ProductPageState extends State<ProductPage> {
                             ),
                             Text(
                               product.sparepartCode != null && product.sparepartCode!.isNotEmpty 
-                                  ? '\${product.sparepartCode} • \${product.sku}' 
+                                  ? '${product.sparepartCode} • ${product.sku}' 
                                   : product.sku,
                               style: const TextStyle(
                                 fontSize: 12,

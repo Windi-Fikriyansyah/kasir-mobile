@@ -22,7 +22,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       final movements = data.map((map) => StockMovementModel.fromMap(map)).toList();
       emit(StockHistoryLoaded(movements));
     } catch (e) {
-      emit(StockError('Gagal memuat riwayat stok: \${e.toString()}'));
+      emit(StockError('Gagal memuat riwayat stok: ${e.toString()}'));
     }
   }
 
@@ -37,7 +37,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       );
       emit(const StockSuccess('Stok masuk berhasil ditambahkan.'));
     } catch (e) {
-      emit(StockError('Gagal menambahkan stok: \${e.toString()}'));
+      emit(StockError('Gagal menambahkan stok: ${e.toString()}'));
     }
   }
 
@@ -52,7 +52,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       );
       emit(const StockSuccess('Stok opname berhasil disimpan.'));
     } catch (e) {
-      emit(StockError('Gagal menyimpan stok opname: \${e.toString()}'));
+      emit(StockError('Gagal menyimpan stok opname: ${e.toString()}'));
     }
   }
 }

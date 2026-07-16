@@ -282,14 +282,7 @@ class _ReportPageState extends State<ReportPage> {
               ),
               const SizedBox(height: 8),
               Text(formattedRevenue, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.trending_up, color: QuickPOSColors.secondary, size: 16),
-                  const SizedBox(width: 4),
-                  const Text('+12.4% vs bln lalu', style: TextStyle(color: QuickPOSColors.secondary, fontSize: 12, fontWeight: FontWeight.w500)),
-                ],
-              )
+
             ],
           ),
         ),
@@ -346,14 +339,7 @@ class _ReportPageState extends State<ReportPage> {
                     const Text('Margin', style: TextStyle(color: QuickPOSColors.onSurfaceVariant, fontSize: 14)),
                     const SizedBox(height: 4),
                     Text('${margin.toStringAsFixed(1)}%', style: const TextStyle(color: QuickPOSColors.primary, fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.trending_up, color: QuickPOSColors.secondary, size: 16),
-                        const SizedBox(width: 4),
-                        const Text('+0.5%', style: TextStyle(color: QuickPOSColors.secondary, fontSize: 12, fontWeight: FontWeight.w500)),
-                      ],
-                    )
+
                   ],
                 ),
               ),
