@@ -171,24 +171,23 @@ class _SalesSummarySection extends StatelessWidget {
     double avgSales = todayCount > 0 ? todaySales / todayCount : 0;
     final formatCurrency = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: DashboardColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: DashboardColors.outlineVariant.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: DashboardColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: DashboardColors.outlineVariant.withOpacity(0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -233,88 +232,71 @@ class _SalesSummarySection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMiniCard('Transaksi', todayCount.toString(), Icons.receipt_long, null),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildMiniCard('Laba Bersih', formatCurrency.format(todayProfit), Icons.trending_up, DashboardColors.secondary),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildMiniCard('Rata-rata', formatCurrency.format(avgSales), Icons.analytics, null),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniCard(String title, String value, IconData icon, Color? valueColor) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: DashboardColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: DashboardColors.outlineVariant.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
             children: [
+              Icon(icon, size: 14, color: DashboardColors.onSurfaceVariant),
+              const SizedBox(width: 4),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Transaksi',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: DashboardColors.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      todayCount.toString(),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: DashboardColors.onSurface,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 10, color: DashboardColors.onSurfaceVariant, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Laba Bersih',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: DashboardColors.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        formatCurrency.format(todayProfit),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: DashboardColors.secondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Rata-rata',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: DashboardColors.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        formatCurrency.format(avgSales),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: DashboardColors.onSurface,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
             ],
+          ),
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: valueColor ?? DashboardColors.onSurface,
+              ),
+            ),
           ),
         ],
       ),

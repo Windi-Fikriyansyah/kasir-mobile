@@ -6,6 +6,8 @@ import 'package:kasirsuper/core/widgets/notification_bell.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/product/models/product_model.dart';
+import 'package:kasirsuper/features/service/blocs/blocs.dart';
+import 'package:kasirsuper/features/service/models/service_model.dart';
 import 'package:intl/intl.dart';
 import 'package:kasirsuper/features/report/services/export_service.dart';
 import 'package:kasirsuper/features/transaction/models/transaction_model.dart';
@@ -55,10 +57,14 @@ class _ReportPageState extends State<ReportPage> {
           builder: (context, txState) {
             return BlocBuilder<ProductBloc, ProductState>(
               builder: (context, prodState) {
-                if (txState is TransactionLoaded && prodState is ProductLoaded) {
-                  return _buildContent(context, txState, prodState);
-                }
-                return const Center(child: CircularProgressIndicator());
+                return BlocBuilder<ServiceBloc, ServiceState>(
+                  builder: (context, serviceState) {
+                    if (txState is TransactionLoaded && prodState is ProductLoaded && serviceState is ServiceLoaded) {
+                      return _buildContent(context, txState, prodState, serviceState);
+                    }
+                    return const Center(child: CircularProgressIndicator());
+                  },
+                );
               },
             );
           },
@@ -67,7 +73,7 @@ class _ReportPageState extends State<ReportPage> {
     );
   }
 
-  Widget _buildContent(BuildContext context, TransactionLoaded txState, ProductLoaded prodState) {
+  Widget _buildContent(BuildContext context, TransactionLoaded txState, ProductLoaded prodState, ServiceLoaded serviceState) {
     final now = DateTime.now();
     var filteredTransactions = txState.transactions.where((txn) {
       final dt = DateTime.parse(txn.date);
@@ -123,13 +129,15 @@ class _ReportPageState extends State<ReportPage> {
     for (var tx in filteredTransactions) {
       if (tx.items != null) {
         for (var item in tx.items!) {
-          final product = prodState.products.firstWhere(
-            (p) => p.id == item.productId,
-            orElse: () => ProductModel(name: '', sku: '', category: 'Lainnya', price: 0, cost: 0, stock: 0, minStock: 0),
-          );
-          String cat = product.category.isNotEmpty ? product.category : 'Lainnya';
-          categoryRevenue[cat] = (categoryRevenue[cat] ?? 0) + (item.price * item.quantity);
-          categoryTransactions[cat] = (categoryTransactions[cat] ?? 0) + 1;
+          if (item.itemType == 'product') {
+            final product = prodState.products.firstWhere(
+              (p) => p.id == item.productId,
+              orElse: () => ProductModel(name: '', sku: '', category: 'Lainnya', price: 0, cost: 0, stock: 0, minStock: 0),
+            );
+            String cat = product.category.isNotEmpty ? product.category : 'Lainnya';
+            categoryRevenue[cat] = (categoryRevenue[cat] ?? 0) + (item.price * item.quantity);
+            categoryTransactions[cat] = (categoryTransactions[cat] ?? 0) + 1;
+          }
         }
       }
     }
@@ -143,8 +151,10 @@ class _ReportPageState extends State<ReportPage> {
     for (var tx in filteredTransactions) {
       if (tx.items != null) {
         for (var item in tx.items!) {
-          productRevenue[item.productId] = (productRevenue[item.productId] ?? 0) + (item.price * item.quantity);
-          productUnits[item.productId] = (productUnits[item.productId] ?? 0) + item.quantity;
+          if (item.itemType == 'product') {
+            productRevenue[item.productId] = (productRevenue[item.productId] ?? 0) + (item.price * item.quantity);
+            productUnits[item.productId] = (productUnits[item.productId] ?? 0) + item.quantity;
+          }
         }
       }
     }
@@ -153,6 +163,27 @@ class _ReportPageState extends State<ReportPage> {
       ..sort((a, b) {
         int unitsA = productUnits[a.key] ?? 0;
         int unitsB = productUnits[b.key] ?? 0;
+        return unitsB.compareTo(unitsA);
+      });
+      
+    // Top Services
+    Map<int, double> serviceRevenue = {};
+    Map<int, int> serviceUnits = {};
+    for (var tx in filteredTransactions) {
+      if (tx.items != null) {
+        for (var item in tx.items!) {
+          if (item.itemType == 'service') {
+            serviceRevenue[item.productId] = (serviceRevenue[item.productId] ?? 0) + (item.price * item.quantity);
+            serviceUnits[item.productId] = (serviceUnits[item.productId] ?? 0) + item.quantity;
+          }
+        }
+      }
+    }
+    
+    var sortedServices = serviceRevenue.entries.toList()
+      ..sort((a, b) {
+        int unitsA = serviceUnits[a.key] ?? 0;
+        int unitsB = serviceUnits[b.key] ?? 0;
         return unitsB.compareTo(unitsA);
       });
 
@@ -168,7 +199,9 @@ class _ReportPageState extends State<ReportPage> {
           if (sortedCategories.isNotEmpty) _buildTopCategories(sortedCategories, categoryTransactions),
           if (sortedCategories.isNotEmpty) const SizedBox(height: 16),
           if (sortedProducts.isNotEmpty) _buildTopProducts(sortedProducts, productUnits, prodState.products, totalPendapatan),
-          if (sortedProducts.isNotEmpty) const SizedBox(height: 24),
+          if (sortedProducts.isNotEmpty) const SizedBox(height: 16),
+          if (sortedServices.isNotEmpty) _buildTopServices(sortedServices, serviceUnits, serviceState.services, totalPendapatan),
+          if (sortedServices.isNotEmpty) const SizedBox(height: 24),
           _buildExportActions(filteredTransactions, prodState.products),
           const SizedBox(height: 24),
         ],
@@ -492,6 +525,94 @@ class _ReportPageState extends State<ReportPage> {
                               children: [
                                 Text(formattedRev, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                                 Text('$units Unit', style: const TextStyle(fontSize: 12, color: QuickPOSColors.secondary)),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 6,
+                          width: double.infinity,
+                          decoration: BoxDecoration(color: QuickPOSColors.surfaceContainer, borderRadius: BorderRadius.circular(3)),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: widthFactor,
+                            child: Container(
+                              decoration: BoxDecoration(color: QuickPOSColors.secondary, borderRadius: BorderRadius.circular(3)),
+                            ),
+                          ),
+                        )
+                      ],
+                    ),
+                  )
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopServices(List<MapEntry<int, double>> sortedServices, Map<int, int> serviceUnits, List<ServiceModel> allServices, double totalPendapatan) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: QuickPOSColors.surfaceContainerLowest,
+        border: Border.all(color: QuickPOSColors.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))]
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Service Terlaris', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          ...sortedServices.take(3).map((entry) {
+            int sId = entry.key;
+            double rev = entry.value;
+            int units = serviceUnits[sId] ?? 0;
+            final service = allServices.firstWhere((s) => s.id == sId, orElse: () => ServiceModel(name: 'Unknown', price: 0, commissionPercent: 0));
+            String formattedRev = NumberFormat.compactCurrency(locale: 'id', symbol: 'Rp ', decimalDigits: 1).format(rev);
+            
+            double widthFactor = totalPendapatan > 0 ? (rev / totalPendapatan) : 0;
+            widthFactor = (widthFactor * 3).clamp(0.1, 1.0);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(color: QuickPOSColors.surfaceContainer, borderRadius: BorderRadius.circular(8)),
+                    clipBehavior: Clip.hardEdge,
+                    child: const Icon(Icons.handyman, color: QuickPOSColors.secondary),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(service.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  Text('Service Jasa', style: const TextStyle(fontSize: 12, color: QuickPOSColors.onSurfaceVariant)),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(formattedRev, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                Text('$units Order', style: const TextStyle(fontSize: 12, color: QuickPOSColors.secondary)),
                               ],
                             ),
                           ],
