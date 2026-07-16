@@ -7,6 +7,7 @@ import 'package:kasirsuper/core/core.dart';
 import 'package:kasirsuper/core/theme/quickpos_colors.dart';
 import 'package:kasirsuper/features/transaction/blocs/transaction_bloc.dart';
 import 'package:kasirsuper/features/product/blocs/blocs.dart';
+import 'package:kasirsuper/features/product/models/product_model.dart';
 import 'package:kasirsuper/features/service/blocs/blocs.dart';
 import 'package:kasirsuper/features/home/home.dart';
 import 'package:kasirsuper/features/service/pages/index/page.dart';
@@ -60,7 +61,7 @@ class _HomePageState extends State<HomePage> {
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  _SalesSummarySection(txState: txState),
+                                  _SalesSummarySection(txState: txState, prodState: prodState),
                                   const SizedBox(height: 16),
                                   const _MenuGridSection(),
                                   const SizedBox(height: 16),
@@ -123,19 +124,47 @@ class _HomeAppBar extends StatelessWidget {
 
 class _SalesSummarySection extends StatelessWidget {
   final TransactionState txState;
-  const _SalesSummarySection({required this.txState});
+  final ProductState prodState;
+  const _SalesSummarySection({required this.txState, required this.prodState});
 
   @override
   Widget build(BuildContext context) {
     double todaySales = 0;
+    double todayProfit = 0;
     int todayCount = 0;
-    if (txState is TransactionLoaded) {
+    
+    if (txState is TransactionLoaded && prodState is ProductLoaded) {
       final now = DateTime.now();
+      final products = (prodState as ProductLoaded).products;
+      
       for (var txn in (txState as TransactionLoaded).transactions) {
         final dt = DateTime.parse(txn.date);
         if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
           todaySales += txn.totalAmount;
           todayCount++;
+          
+          if (txn.items != null) {
+            double txSubTotal = 0;
+            double txCost = 0;
+            double txCommission = 0;
+
+            for (var item in txn.items!) {
+              txSubTotal += item.price * item.quantity;
+              txCommission += item.commissionAmount;
+
+              if (item.itemType == 'product') {
+                final product = products.firstWhere(
+                  (p) => p.id == item.productId,
+                  orElse: () => ProductModel(name: '', sku: '', category: '', price: 0, cost: 0, stock: 0, minStock: 0),
+                );
+                txCost += product.cost * item.quantity;
+              }
+            }
+
+            double discountAmount = txSubTotal * (txn.discountPercent ?? 0) / 100;
+            double netRevenue = txSubTotal - discountAmount;
+            todayProfit += (netRevenue - txCost - txCommission);
+          }
         }
       }
     }
@@ -235,7 +264,34 @@ class _SalesSummarySection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Rata-rata Belanja',
+                      'Laba Bersih',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: DashboardColors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        formatCurrency.format(todayProfit),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: DashboardColors.secondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Rata-rata',
                       style: TextStyle(
                         fontSize: 12,
                         color: DashboardColors.onSurfaceVariant,

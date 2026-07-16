@@ -91,14 +91,26 @@ class _ReportPageState extends State<ReportPage> {
     for (var tx in filteredTransactions) {
       totalPendapatan += tx.totalAmount;
       if (tx.items != null) {
+        double txSubTotal = 0;
+        double txCost = 0;
+        double txCommission = 0;
+
         for (var item in tx.items!) {
-          // Find product cost
-          final product = prodState.products.firstWhere(
-            (p) => p.id == item.productId,
-            orElse: () => ProductModel(name: '', sku: '', category: '', price: 0, cost: 0, stock: 0, minStock: 0),
-          );
-          labaBersih += (item.price - product.cost) * item.quantity;
+          txSubTotal += item.price * item.quantity;
+          txCommission += item.commissionAmount;
+
+          if (item.itemType == 'product') {
+            final product = prodState.products.firstWhere(
+              (p) => p.id == item.productId,
+              orElse: () => ProductModel(name: '', sku: '', category: '', price: 0, cost: 0, stock: 0, minStock: 0),
+            );
+            txCost += product.cost * item.quantity;
+          }
         }
+
+        double discountAmount = txSubTotal * (tx.discountPercent ?? 0) / 100;
+        double netRevenue = txSubTotal - discountAmount;
+        labaBersih += (netRevenue - txCost - txCommission);
       }
     }
     

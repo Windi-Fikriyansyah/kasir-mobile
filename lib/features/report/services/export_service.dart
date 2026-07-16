@@ -41,10 +41,10 @@ class ExportService {
       // Data
       double grandTotal = 0;
       for (var tx in transactions) {
+        grandTotal += tx.totalAmount;
         if (tx.items != null) {
           for (var item in tx.items!) {
             final subtotal = item.price * item.quantity;
-            grandTotal += subtotal;
             sheet.appendRow([
               TextCellValue(DateFormat('dd-MM-yyyy HH:mm').format(DateTime.parse(tx.date))),
               TextCellValue('TXN-${tx.id.toString().padLeft(4, '0')}'),
@@ -105,13 +105,26 @@ class ExportService {
       for (var tx in transactions) {
         grandTotal += tx.totalAmount;
         if (tx.items != null) {
+          double txSubTotal = 0;
+          double txCost = 0;
+          double txCommission = 0;
+
           for (var item in tx.items!) {
-            final product = products.firstWhere(
-              (p) => p.id == item.productId,
-              orElse: () => ProductModel(name: '', sku: '', category: '', price: 0, cost: 0, stock: 0, minStock: 0),
-            );
-            totalProfit += (item.price - product.cost) * item.quantity;
+            txSubTotal += item.price * item.quantity;
+            txCommission += item.commissionAmount;
+
+            if (item.itemType == 'product') {
+              final product = products.firstWhere(
+                (p) => p.id == item.productId,
+                orElse: () => ProductModel(name: '', sku: '', category: '', price: 0, cost: 0, stock: 0, minStock: 0),
+              );
+              txCost += product.cost * item.quantity;
+            }
           }
+          
+          double discountAmount = txSubTotal * (tx.discountPercent ?? 0) / 100;
+          double netRevenue = txSubTotal - discountAmount;
+          totalProfit += (netRevenue - txCost - txCommission);
         }
       }
 
